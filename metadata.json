@@ -1,0 +1,6 @@
+{
+  "name": "어슬런데이",
+  "description": "나주동강중학교 전교생 21명을 위한 실시간 러닝 분석, 경로 시각화, 소셜 피드, 랭킹 및 단계별 러닝 플랜과 AI 코칭 웹앱",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

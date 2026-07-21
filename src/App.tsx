@@ -1,0 +1,2686 @@
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  Compass,
+  Trophy,
+  Users,
+  Award,
+  User,
+  Clock,
+  MapPin,
+  Activity,
+  Heart,
+  MessageSquare,
+  Play,
+  Pause,
+  RotateCcw,
+  Sparkles,
+  Flame,
+  CheckCircle2,
+  Volume2,
+  VolumeX,
+  Database,
+  Map,
+  ChevronRight,
+  TrendingUp,
+  Smile,
+  Send,
+  Plus
+} from "lucide-react";
+
+// For Leaflet map loading via CDN
+declare const L: any;
+
+interface UserProfile {
+  id: string;
+  name: string;
+  grade: number;
+  totalDistance: number;
+  totalDuration: number;
+  level: number;
+  stamps: string[];
+  badges: string[];
+}
+
+interface Activity {
+  id: string;
+  userId: string;
+  userName: string;
+  grade: number;
+  date: string;
+  distance: number;
+  duration: number;
+  pace: string;
+  memo: string;
+  path: [number, number][];
+}
+
+interface Comment {
+  id: string;
+  userId: string;
+  userName: string;
+  text: string;
+  date: string;
+}
+
+interface Post {
+  id: string;
+  userId: string;
+  userName: string;
+  grade: number;
+  content: string;
+  distance?: number;
+  duration?: number;
+  pace?: string;
+  path?: [number, number][];
+  likes: string[];
+  comments: Comment[];
+  date: string;
+  isRunRecord?: boolean;
+}
+
+interface Mission {
+  id: string;
+  title: string;
+  description: string;
+  goal: number;
+  type: "distance" | "count" | "pace";
+  rewardStamp: number;
+  isWeekly: boolean;
+}
+
+const getGradeLabel = (grade: number) => {
+  if (grade === 4) return "교직원";
+  if (grade === 0) return "게스트";
+  return `${grade}학년`;
+};
+
+// 4-Week Beginner Running Plan Data (like RunDay)
+interface PlanDay {
+  day: number;
+  title: string;
+  sequence: { type: "walk" | "run" | "warmup" | "cooldown"; duration: number; text: string }[];
+}
+
+const RUNNING_PLANS: { week: number; days: PlanDay[] }[] = [
+  {
+    week: 1, // 🌱 Course 1: 5-Minute Running Course
+    days: [
+      {
+        day: 1,
+        title: "5분 코스 1일차 - 첫걸음 걷고 달리기",
+        sequence: [
+          { type: "warmup", duration: 60, text: "준비 운동을 위해 1분간 가볍게 걷습니다." },
+          { type: "run", duration: 60, text: "첫 번째 달리기! 1분 동안 가볍게 뛰어보세요. 무리하지 마세요." },
+          { type: "walk", duration: 120, text: "2분 동안 천천히 걸으면서 호흡을 일정하게 가다듬으세요." },
+          { type: "run", duration: 60, text: "다시 1분간 즐겁고 경쾌한 페이스로 뛰어봅시다!" },
+          { type: "walk", duration: 120, text: "2분간 한숨 쉬면서 천천히 걸어주세요." },
+          { type: "cooldown", duration: 60, text: "마무리 정리 운동 걷기입니다. 첫 도전을 환영합니다!" }
+        ]
+      },
+      {
+        day: 2,
+        title: "5분 코스 2일차 - 페이스 감각 다지기",
+        sequence: [
+          { type: "warmup", duration: 60, text: "가볍게 1분 동안 천천히 걸으며 다리와 어깨 관절을 활성화합니다." },
+          { type: "run", duration: 90, text: "1분 30초 동안 어깨의 힘을 툭 빼고 부드럽게 뛰어보세요." },
+          { type: "walk", duration: 120, text: "2분 동안 걷기 시간입니다. 가벼운 발걸음으로 천천히 호흡하세요." },
+          { type: "run", duration: 90, text: "다시 한번 1분 30초 동안 힘차게 한 발씩 내딛으며 뛰어봅시다." },
+          { type: "cooldown", duration: 60, text: "정리 운동을 위해 1분간 영산강의 기분 좋은 시원한 바람을 느끼며 걷습니다." }
+        ]
+      },
+      {
+        day: 3,
+        title: "5분 코스 3일차 - 5분 연속 달리기 기적의 완주",
+        sequence: [
+          { type: "warmup", duration: 90, text: "5분 연속 달리기를 앞두고 충분히 몸을 달구기 위해 1분 30초간 걷습니다." },
+          { type: "run", duration: 300, text: "오늘의 마스터 도전! 5분 동안 쉬지 않고 일정한 페이스로 달리기 시작! 앞사람 뒤꽁무니만 보며 호흡을 지키세요!" },
+          { type: "cooldown", duration: 90, text: "우와, 5분 연속 달리기를 해내셨습니다! 1분 30초간 천천히 걸으며 심박수를 완벽하게 회복해 봅니다." }
+        ]
+      }
+    ]
+  },
+  {
+    week: 2, // 🏃‍♂️ Course 2: 30-Minute Running Course
+    days: [
+      {
+        day: 1,
+        title: "30분 코스 1일차 - 15분 연속 페이스 체크",
+        sequence: [
+          { type: "warmup", duration: 120, text: "30분 달리기의 도전을 위해 2분 동안 경쾌한 속도로 걷기 워밍업을 진행합니다." },
+          { type: "run", duration: 900, text: "15분 연속 달리기입니다! 무턱대고 달리지 말고, 옆 친구와 수다 떨 수 있을 정도의 편안한 페이스를 찾으세요." },
+          { type: "cooldown", duration: 120, text: "환상적인 질주였습니다! 15분 완수 완료. 2분간 충분한 정리 걷기를 진행하며 물을 드세요." }
+        ]
+      },
+      {
+        day: 2,
+        title: "30분 코스 2일차 - 20분 끈기의 불꽃",
+        sequence: [
+          { type: "warmup", duration: 120, text: "체내 페이스 유지력을 높이는 20분 러닝 코스입니다. 워밍업 걷기 2분 출발!" },
+          { type: "run", duration: 1200, text: "20분 연속 달리기 시작! 가슴을 당당히 펴고 영산강 강변 자전거길의 경치를 정복하러 떠납니다!" },
+          { type: "cooldown", duration: 120, text: "한계를 뛰어넘은 나 자신에게 격려의 박수를! 2분간 천천히 걸어 체온을 서서히 복구합니다." }
+        ]
+      },
+      {
+        day: 3,
+        title: "30분 코스 3일차 - 영산강 수변로 30분 완전 완주",
+        sequence: [
+          { type: "warmup", duration: 180, text: "꿈의 30분 논스톱 러닝 완료를 위해 3분 동안 온몸의 피를 원활히 돌리는 준비 걷기를 진행합니다." },
+          { type: "run", duration: 1800, text: "대망의 30분 달리기 도전! 포기하고 싶은 순간마다 나주 동강 전교생 친구들의 응원을 떠올리며 나만의 리듬으로 한 발자국씩 가볍게 골인하세요!" },
+          { type: "cooldown", duration: 180, text: "해냈습니다! 여러분은 30분 연속 달리기를 완전히 완주했습니다! 3분 정리 걷기를 만끽하며 승리의 호흡을 쉬세요." }
+        ]
+      }
+    ]
+  },
+  {
+    week: 3, // 🔥 Course 3: 60-Minute Running Course (Endurance Elite)
+    days: [
+      {
+        day: 1,
+        title: "60분 코스 1일차 - 40분 연속 에코 LSD 러닝",
+        sequence: [
+          { type: "warmup", duration: 180, text: "고급 지구력 빌드업 코스입니다. 3분간 힘있게 걷습니다." },
+          { type: "run", duration: 2400, text: "40분 연속 달리기 출발! '습습후후' 일정한 템포의 호흡을 타고 뇌와 온몸에 풍성한 산소를 가득 충전하며 영산강 수변을 달립니다." },
+          { type: "cooldown", duration: 180, text: "완벽하게 페이스를 방어하며 40분 완료! 3분 동안 가볍게 몸을 흔들며 고루 걷습니다." }
+        ]
+      },
+      {
+        day: 2,
+        title: "60분 코스 2일차 - 50분 페이스 마스터 클래스",
+        sequence: [
+          { type: "warmup", duration: 180, text: "기적의 완주를 단 한 걸음 앞두고, 50분 인터벌 트레이닝에 돌입합니다. 3분간 워밍업 걷기 출발!" },
+          { type: "run", duration: 3000, text: "50분 연속 질주! 허리를 세우고 턱을 가볍게 당겨 중심을 일정히 유지하며 가쁜 숨을 컨트롤하며 달립니다." },
+          { type: "cooldown", duration: 180, text: "어메이징합니다! 승리자의 자격을 완전히 입증하셨군요. 3분간 천천히 걸으면서 흥분한 근육들을 가볍게 이완시켜 주세요." }
+        ]
+      },
+      {
+        day: 3,
+        title: "60분 코스 3일차 - 동강 영산강 자전거길 완전 제패 (60분 완주)",
+        sequence: [
+          { type: "warmup", duration: 300, text: "어슬런데이에 한 획을 그을 최종 완성! 60분 도전을 앞두고 발목과 다리 근육을 촉촉히 깨울 5분간의 준비 워밍업을 기쁘게 시작합니다." },
+          { type: "run", duration: 3600, text: "60분 연속 무한 질주! 페이스 조절을 마친 당신은 이미 최고의 엘리트 러너입니다. 지금부터 1시간 동안 강물을 조화롭게 벗 삼아 나주 동강중의 전설이 되어보세요!" },
+          { type: "cooldown", duration: 300, text: "전율이 흐르는 최종 완주 성공! 무려 60분 연속 달리기를 제패하셨습니다! 5분간 승리의 천천히 걷기를 음미하며 어슬런데이를 대성공으로 장식합니다." }
+        ]
+      }
+    ]
+  }
+];
+
+// Naju Donggang Middle School Scenic Simulated Route Coordinates
+const NAJU_SIMULATION_ROUTE: [number, number][] = [
+  [34.8988, 126.6025], // 동강중학교 정문 (출발)
+  [34.8974, 126.6012], // 동강면 사무소 삼거리
+  [34.8953, 126.5985], // 나주동강초등학교 정문 앞
+  [34.8921, 126.5958], // 동강교차로 진입길
+  [34.8875, 126.5932], // 영산강 강변 자전거길 합류지점!
+  [34.8836, 126.5908], // 영산강 물줄기가 보이는 강변 데크길 1
+  [34.8808, 126.5931], // 영산강 정자 쉼터 (반환점)
+  [34.8836, 126.5908], // 복귀길 데크길 1
+  [34.8875, 126.5932], // 자전거길 분기점
+  [34.8921, 126.5958], // 동강교차로
+  [34.8953, 126.5985], // 동강초등학교
+  [34.8988, 126.6025]  // 동강중학교 복귀 (골인)
+];
+
+const BADGE_INFO: Record<string, { name: string; desc: string; icon: string; color: string }> = {
+  "first-run": { name: "어슬런의 첫발", desc: "첫 달리기를 완주하고 피드에 공유함", icon: "👟", color: "bg-emerald-100 text-emerald-700 border-emerald-300" },
+  "speedy": { name: "영산강 바람", desc: "평균 페이스 6:00 이내의 쾌속 질주 달성", icon: "⚡", color: "bg-amber-100 text-amber-700 border-amber-300" },
+  "consistent": { name: "꾸준함의 아이콘", desc: "스탬프를 3개 이상 모아 성실함 입증", icon: "📅", color: "bg-blue-100 text-blue-700 border-blue-300" },
+  "distance-10": { name: "동강 러너", desc: "누적 달리기 거리 10km 돌파", icon: "🏆", color: "bg-purple-100 text-purple-700 border-purple-300" },
+  "marathon-club": { name: "동강철인 30", desc: "누적 달리기 거리 30km 돌파", icon: "🔥", color: "bg-orange-100 text-orange-700 border-orange-300" },
+  "legend": { name: "어슬런 마스터", desc: "누적 달리기 거리 50km 돌파 전교 레전드", icon: "👑", color: "bg-rose-100 text-rose-700 border-rose-300" },
+  "stamp-collector": { name: "스탬프 수집 대장", desc: "누적 스탬프 획득 수 5개 이상 돌파", icon: "💮", color: "bg-pink-100 text-pink-700 border-pink-300" }
+};
+
+export default function App() {
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [tab, setTab] = useState<"home" | "run" | "plan" | "ranking" | "feed" | "report" | "teacher">("home");
+
+  // Geolocation states
+  const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [runDistance, setRunDistance] = useState(0); // km
+  const [runDuration, setRunDuration] = useState(0); // seconds
+  const [runPath, setRunPath] = useState<[number, number][]>([]);
+  const [runMemo, setRunMemo] = useState("");
+  const [gpsSimulated, setGpsSimulated] = useState(true); // Default simulator mode for testing in iframe!
+  const [voiceCoachingEnabled, setVoiceCoachingEnabled] = useState(true);
+  const [isSubmittingRun, setIsSubmittingRun] = useState(false);
+
+  // Beginner Running Plan Training States
+  const [activeTraining, setActiveTraining] = useState<{ week: number; day: number } | null>(null);
+  const [trainingActive, setTrainingActive] = useState(false);
+  const [trainingIndex, setTrainingIndex] = useState(0);
+  const [trainingTimer, setTrainingTimer] = useState(0);
+  const [coachingText, setCoachingText] = useState("");
+  const [coachingVolume, setCoachingVolume] = useState(true);
+
+  // AI Coaching States
+  const [aiReport, setAiReport] = useState("");
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [aiLoadingMessage, setAiLoadingMessage] = useState("");
+
+  // Teacher View States
+  const [selectedTeacherStudentId, setSelectedTeacherStudentId] = useState<string>("");
+  const [teacherMemoText, setTeacherMemoText] = useState<string>("");
+  const [teacherStampsCount, setTeacherStampsCount] = useState<number>(1);
+  const [isSubmittingTeacherAward, setIsSubmittingTeacherAward] = useState<boolean>(false);
+
+  // Login states
+  const [loginGradeTab, setLoginGradeTab] = useState<number | "guest" | "staff">(1);
+  const [guestNameInput, setGuestNameInput] = useState("");
+  const [isLoggingInGuest, setIsLoggingInGuest] = useState(false);
+  const [showTeacherPasswordModal, setShowTeacherPasswordModal] = useState(false);
+  const [teacherPasswordInput, setTeacherPasswordInput] = useState("");
+  const [teacherPasswordError, setTeacherPasswordError] = useState("");
+
+  // Social Feed state
+  const [newPostText, setNewPostText] = useState("");
+  const [postCommentText, setPostCommentText] = useState<Record<string, string>>({});
+
+  // Refs for tracking
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const polylineInstanceRef = useRef<any>(null);
+  const markerInstanceRef = useRef<any>(null);
+  const gpsWatcherRef = useRef<number | null>(null);
+  const runTimerRef = useRef<any>(null);
+  const trainingTimerRef = useRef<any>(null);
+  const wakeLockRef = useRef<any>(null);
+
+  // Confetti overlay effect trigger
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [confettiMessage, setConfettiMessage] = useState("");
+
+  // Load initial data
+  useEffect(() => {
+    fetchUsers();
+    fetchActivities();
+    fetchPosts();
+    fetchMissions();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch("/api/users");
+      const data = await res.json();
+      setUsers(data);
+      
+      const savedUserId = localStorage.getItem("easurun_user_id");
+      if (savedUserId) {
+        // Teacher session fallback
+        if (savedUserId === "teacher") {
+          setCurrentUser({
+            id: "teacher",
+            name: "담임 선생님",
+            grade: 0,
+            totalDistance: 0,
+            totalDuration: 0,
+            level: 10,
+            stamps: [],
+            badges: []
+          });
+          setTab("teacher");
+          return;
+        }
+
+        const savedUser = data.find((u: any) => u.id === savedUserId);
+        if (savedUser) {
+          setCurrentUser(savedUser);
+          return;
+        }
+      }
+      
+      // No logged in user -> show login screen
+      setCurrentUser(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchActivities = async () => {
+    try {
+      const res = await fetch("/api/activities");
+      const data = await res.json();
+      setActivities(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchPosts = async () => {
+    try {
+      const res = await fetch("/api/posts");
+      const data = await res.json();
+      setPosts(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchMissions = async () => {
+    try {
+      const res = await fetch("/api/missions");
+      const data = await res.json();
+      setMissions(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Switch student
+  const handleUserChange = (userId: string) => {
+    if (userId === "teacher") {
+      localStorage.setItem("easurun_user_id", "teacher");
+      setCurrentUser({
+        id: "teacher",
+        name: "담임 선생님",
+        grade: 0,
+        totalDistance: 0,
+        totalDuration: 0,
+        level: 10,
+        stamps: [],
+        badges: []
+      });
+      setTab("teacher");
+      return;
+    }
+
+    const selected = users.find(u => u.id === userId);
+    if (selected) {
+      localStorage.setItem("easurun_user_id", userId);
+      setCurrentUser(selected);
+      // Reset AI Report for the new user so they get fresh analysis
+      setAiReport("");
+      // Stop running/training on user change to prevent state bleed
+      if (isRunning) stopRunningAndCleanup();
+      if (trainingActive) stopTrainingAndCleanup();
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("easurun_user_id");
+    setCurrentUser(null);
+    setTab("home");
+    speakText("로그아웃 되었습니다. 다른 계정으로 로그인해 주세요.");
+  };
+
+  const handleTeacherPasswordVerify = () => {
+    if (teacherPasswordInput === "098900") {
+      localStorage.setItem("easurun_user_id", "teacher");
+      setCurrentUser({
+        id: "teacher",
+        name: "담임 선생님",
+        grade: 0,
+        totalDistance: 0,
+        totalDuration: 0,
+        level: 10,
+        stamps: [],
+        badges: []
+      });
+      setTab("teacher");
+      setShowTeacherPasswordModal(false);
+      setTeacherPasswordInput("");
+      setTeacherPasswordError("");
+      speakText("인증되었습니다. 교사 대시보드로 로그인되었습니다.");
+      triggerCelebration("🧑‍🏫 교사 대시보드 권한으로 로그인되었습니다.");
+    } else {
+      setTeacherPasswordError("비밀번호가 올바르지 않습니다. 다시 입력해 주세요.");
+      speakText("비밀번호가 올바르지 않습니다.");
+    }
+  };
+
+  const renderTeacherPasswordModal = () => {
+    if (!showTeacherPasswordModal) return null;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 text-slate-100"
+        >
+          <div className="text-center space-y-2">
+            <div className="mx-auto w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20">
+              <Database size={24} />
+            </div>
+            <h3 className="text-lg font-black text-white">교사 관리실 인증</h3>
+            <p className="text-xs text-slate-400">
+              담임 선생님 전용 공간입니다. 진입 비밀번호를 입력하세요.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <input
+              type="password"
+              value={teacherPasswordInput}
+              onChange={(e) => {
+                setTeacherPasswordInput(e.target.value);
+                setTeacherPasswordError("");
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleTeacherPasswordVerify();
+                }
+              }}
+              placeholder="비밀번호 6자리 입력"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-black text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none placeholder:text-slate-700 text-center tracking-widest"
+              autoFocus
+            />
+            {teacherPasswordError && (
+              <p className="text-xs font-bold text-rose-400 text-center">
+                ❌ {teacherPasswordError}
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={() => {
+                setShowTeacherPasswordModal(false);
+                setTeacherPasswordInput("");
+                setTeacherPasswordError("");
+              }}
+              className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition cursor-pointer"
+            >
+              취소
+            </button>
+            <button
+              onClick={handleTeacherPasswordVerify}
+              className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl text-xs shadow-md transition cursor-pointer"
+            >
+              확인
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  };
+
+  // Voice Speech synthesizer helper
+  const speakText = (text: string) => {
+    if (!voiceCoachingEnabled || !coachingVolume) return;
+    if ("speechSynthesis" in window) {
+      // Cancel previous speech
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "ko-KR";
+      utterance.rate = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // Trigger celebration banner
+  const triggerCelebration = (msg: string) => {
+    setConfettiMessage(msg);
+    setShowConfetti(true);
+    setTimeout(() => {
+      setShowConfetti(false);
+    }, 5000);
+  };
+
+  // Geolocation Haversine Distance Calculator
+  const calcDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // distance in km
+  };
+
+  // Screen Wake Lock API helpers to prevent phone from locking/turning screen off while running
+  const requestWakeLock = async () => {
+    try {
+      if ("wakeLock" in navigator) {
+        wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
+        console.log("화면 꺼짐 방지(Wake Lock)가 활성화되었습니다.");
+      }
+    } catch (err) {
+      console.warn("화면 꺼짐 방지 활성화 실패:", err);
+    }
+  };
+
+  const releaseWakeLock = () => {
+    try {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().then(() => {
+          wakeLockRef.current = null;
+          console.log("화면 꺼짐 방지(Wake Lock)가 해제되었습니다.");
+        });
+      }
+    } catch (err) {
+      console.error("화면 꺼짐 방지 해제 중 오류:", err);
+    }
+  };
+
+  // Start Real-time GPS/Simulated running
+  const startRunning = () => {
+    if (!currentUser) return;
+    setIsRunning(true);
+    setIsPaused(false);
+    setRunDistance(0);
+    setRunDuration(0);
+    setRunMemo("");
+
+    // Request Wake Lock
+    requestWakeLock();
+
+    const initialCoords: [number, number] = [34.8988, 126.6025]; // Naju Donggang Middle School
+    setRunPath([initialCoords]);
+
+    speakText("어슬런데이 실시간 트래킹을 시작합니다! 가볍고 상쾌한 걸음으로 몸을 깨워주세요.");
+
+    // Start Timer
+    runTimerRef.current = setInterval(() => {
+      setRunDuration(prev => prev + 1);
+    }, 1000);
+
+    // Path Simulator or Real GPS Watcher
+    if (gpsSimulated) {
+      let stepIndex = 0;
+      const simInterval = setInterval(() => {
+        if (isPaused) return;
+        stepIndex++;
+        if (stepIndex < NAJU_SIMULATION_ROUTE.length) {
+          const nextPt = NAJU_SIMULATION_ROUTE[stepIndex];
+          setRunPath(prev => {
+            const lastPt = prev[prev.length - 1];
+            const segmentDist = calcDistance(lastPt[0], lastPt[1], nextPt[0], nextPt[1]);
+            setRunDistance(d => parseFloat((d + segmentDist).toFixed(3)));
+            return [...prev, nextPt];
+          });
+
+          // Periodic Simulator voice prompts
+          if (stepIndex === 4) {
+            speakText("우와! 영산강 강변 수변도로 자전거 길에 진입하셨습니다. 흐르는 강물과 바람을 느껴보세요!");
+          } else if (stepIndex === 6) {
+            speakText("반환점인 영산강 정자에 도달했습니다! 이제 학교를 향해 힘을 내어 복귀해볼까요?");
+          }
+        } else {
+          // If simulator reaches end, generate tiny offsets around school
+          const lastPt = NAJU_SIMULATION_ROUTE[NAJU_SIMULATION_ROUTE.length - 1];
+          const newPt: [number, number] = [
+            lastPt[0] + (Math.random() - 0.5) * 0.0003,
+            lastPt[1] + (Math.random() - 0.5) * 0.0003
+          ];
+          setRunPath(prev => {
+            const pLast = prev[prev.length - 1];
+            const segmentDist = calcDistance(pLast[0], pLast[1], newPt[0], newPt[1]);
+            setRunDistance(d => parseFloat((d + segmentDist).toFixed(3)));
+            return [...prev, newPt];
+          });
+        }
+      }, 3000);
+
+      // Store simulated tracker inside the same ref logic
+      gpsWatcherRef.current = simInterval as any;
+    } else {
+      // Real Geolocation
+      if ("geolocation" in navigator) {
+        gpsWatcherRef.current = navigator.geolocation.watchPosition(
+          (position) => {
+            if (isPaused) return;
+            const { latitude, longitude } = position.coords;
+            const newPt: [number, number] = [latitude, longitude];
+
+            setRunPath(prev => {
+              if (prev.length > 0) {
+                const lastPt = prev[prev.length - 1];
+                const d = calcDistance(lastPt[0], lastPt[1], latitude, longitude);
+                // Filter small jitter
+                if (d > 0.002) {
+                  setRunDistance(dist => parseFloat((dist + d).toFixed(3)));
+                  return [...prev, newPt];
+                }
+                return prev;
+              }
+              return [newPt];
+            });
+          },
+          (error) => {
+            console.error("GPS Geolocation Error:", error);
+            // Auto switch to simulator to maintain frictionless experience
+            setGpsSimulated(true);
+            speakText("GPS 신호 수신이 불안정하여 영산강 데크길 시뮬레이션 모드로 전환합니다.");
+          },
+          { enableHighAccuracy: true }
+        );
+      } else {
+        setGpsSimulated(true);
+      }
+    }
+  };
+
+  // Pause running
+  const pauseRunning = () => {
+    setIsPaused(true);
+    speakText("달리기를 잠시 일시 정지합니다. 호흡을 가다듬으세요.");
+  };
+
+  // Resume running
+  const resumeRunning = () => {
+    setIsPaused(false);
+    speakText("달리기를 다시 시작합니다! 활기차게 호흡해 보세요.");
+  };
+
+  // Stop running and reset variables safely
+  const stopRunningAndCleanup = () => {
+    setIsRunning(false);
+    setIsPaused(false);
+    if (runTimerRef.current) clearInterval(runTimerRef.current);
+    if (gpsWatcherRef.current) {
+      if (gpsSimulated) {
+        clearInterval(gpsWatcherRef.current);
+      } else {
+        navigator.geolocation.clearWatch(gpsWatcherRef.current);
+      }
+    }
+    // Release Wake Lock
+    releaseWakeLock();
+  };
+
+  // Submit running record
+  const submitRunningRecord = async () => {
+    if (!currentUser || runDistance < 0.01) return;
+    setIsSubmittingRun(true);
+
+    const min = Math.floor(runDuration / 60);
+    const sec = runDuration % 60;
+    const minutesDecimal = runDuration / 60;
+    const calculatedPaceMin = runDistance > 0 ? Math.floor(minutesDecimal / runDistance) : 0;
+    const calculatedPaceSec = runDistance > 0 ? Math.round(((minutesDecimal / runDistance) % 1) * 60) : 0;
+    const finalPace = `${calculatedPaceMin}:${calculatedPaceSec < 10 ? "0" + calculatedPaceSec : calculatedPaceSec}`;
+
+    try {
+      const response = await fetch("/api/activities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          distance: runDistance,
+          duration: runDuration,
+          pace: finalPace,
+          memo: runMemo || "나주동강 어슬런데이 달리기 완료!",
+          path: runPath
+        })
+      });
+
+      if (response.ok) {
+        speakText(`어슬런데이 완주를 축하합니다! ${runDistance} 킬로미터를 기록하여 발도장 스탬프 한 개가 적립되었습니다.`);
+        triggerCelebration(`🎉 어슬런데이 완주! ${runDistance}km 기록! 스탬프 획득 완료!`);
+
+        // Refresh lists
+        await fetchUsers();
+        await fetchActivities();
+        await fetchPosts();
+
+        // Stop running and switch to Feed
+        stopRunningAndCleanup();
+        setTab("feed");
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSubmittingRun(false);
+    }
+  };
+
+  // Map Drawing Effect
+  useEffect(() => {
+    if (tab !== "run" || !mapContainerRef.current) return;
+
+    // Check if map already exists, remove it
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
+    }
+
+    const defaultCoords = runPath.length > 0 ? runPath[runPath.length - 1] : [34.8988, 126.6025];
+
+    try {
+      // Create Map
+      const map = L.map(mapContainerRef.current).setView(defaultCoords, 15);
+      mapInstanceRef.current = map;
+
+      // Add Tile Layer
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors"
+      }).addTo(map);
+
+      // Draw Polyline for route
+      const polyline = L.polyline(runPath, {
+        color: "#22c55e", // Emerald green athletic line
+        weight: 6,
+        opacity: 0.85,
+        lineCap: "round"
+      }).addTo(map);
+      polylineInstanceRef.current = polyline;
+
+      // Add current position marker
+      const marker = L.circleMarker(defaultCoords, {
+        radius: 8,
+        fillColor: "#e11d48", // Rose Red sporty dot
+        color: "#ffffff",
+        weight: 3,
+        fillOpacity: 1
+      }).addTo(map);
+      markerInstanceRef.current = marker;
+
+      // Map scale
+      L.control.scale().addTo(map);
+    } catch (e) {
+      console.error("Leaflet loading error", e);
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [tab, isRunning]);
+
+  // Update map polyline and center as runPath changes
+  useEffect(() => {
+    if (tab === "run" && mapInstanceRef.current && runPath.length > 0) {
+      const lastPt = runPath[runPath.length - 1];
+      if (polylineInstanceRef.current) {
+        polylineInstanceRef.current.setLatLngs(runPath);
+      }
+      if (markerInstanceRef.current) {
+        markerInstanceRef.current.setLatLng(lastPt);
+      }
+      mapInstanceRef.current.panTo(lastPt);
+    }
+  }, [runPath, tab]);
+
+  // Start Training Program with Voice Coaching
+  const startTraining = (week: number, day: number, plan: PlanDay) => {
+    if (trainingActive) stopTrainingAndCleanup();
+
+    setActiveTraining({ week, day });
+    setTrainingActive(true);
+    setTrainingIndex(0);
+    setTrainingTimer(plan.sequence[0].duration);
+    setCoachingText(plan.sequence[0].text);
+
+    const courseName = week === 1 ? "초급 5분 달리기 코스" : week === 2 ? "중급 30분 달리기 코스" : "고급 60분 달리기 코스";
+    speakText(`어슬런데이 코칭 플랜, ${courseName} ${day}일차 트레이닝을 시작합니다. ${plan.sequence[0].text}`);
+
+    trainingTimerRef.current = setInterval(() => {
+      setTrainingTimer(prev => {
+        if (prev <= 1) {
+          // Go to next training segment
+          setTrainingIndex(currIdx => {
+            const nextIdx = currIdx + 1;
+            if (nextIdx < plan.sequence.length) {
+              const nextSegment = plan.sequence[nextIdx];
+              setCoachingText(nextSegment.text);
+              speakText(nextSegment.text);
+              return nextIdx;
+            } else {
+              // Finished Training!
+              clearInterval(trainingTimerRef.current);
+              setTrainingActive(false);
+              speakText("축하합니다! 오늘의 러닝 플랜을 무사히 완료하셨습니다. 엄청난 성장이군요!");
+              triggerCelebration(`🏆 ${courseName} ${day}일차 트레이닝 완주 성공! 성과 스탬프가 추가됩니다.`);
+              claimMissionReward("mission-2"); // Treat as frequency stamp completion
+              return currIdx;
+            }
+          });
+          // Next segment duration fallback
+          const nextSegment = plan.sequence[trainingIndex + 1];
+          return nextSegment ? nextSegment.duration : 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const stopTrainingAndCleanup = () => {
+    setTrainingActive(false);
+    setActiveTraining(null);
+    if (trainingTimerRef.current) clearInterval(trainingTimerRef.current);
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  };
+
+  // Claim Mission Stamp reward
+  const claimMissionReward = async (missionId: string) => {
+    if (!currentUser) return;
+    try {
+      const res = await fetch("/api/missions/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: currentUser.id, missionId })
+      });
+      if (res.ok) {
+        triggerCelebration("💮 미션 미션 완주 스탬프 발도장을 적립했습니다!");
+        await fetchUsers();
+        await fetchMissions();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Submit Social Post
+  const handleCreatePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || !newPostText.trim()) return;
+
+    try {
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: currentUser.id, content: newPostText })
+      });
+      if (res.ok) {
+        setNewPostText("");
+        await fetchPosts();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Submit teacher praise and stamp award
+  const handleTeacherAward = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTeacherStudentId) return;
+
+    setIsSubmittingTeacherAward(true);
+    try {
+      const res = await fetch("/api/teacher/award", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: selectedTeacherStudentId,
+          teacherMemo: teacherMemoText,
+          awardStampCount: teacherStampsCount
+        })
+      });
+
+      if (res.ok) {
+        const student = users.find(u => u.id === selectedTeacherStudentId);
+        const studentName = student ? student.name : "학생";
+        speakText(`${studentName} 학생에게 칭찬 배달 완료! 스탬프 ${teacherStampsCount}개를 선물했습니다.`);
+        triggerCelebration(`🧑‍🏫 ${studentName} 학생에게 칭찬과 스탬프 ${teacherStampsCount}개 선물 완료!`);
+        setTeacherMemoText("");
+        setTeacherStampsCount(1);
+        setSelectedTeacherStudentId("");
+        
+        // Refresh data
+        await fetchUsers();
+        await fetchPosts();
+        await fetchActivities();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSubmittingTeacherAward(false);
+    }
+  };
+
+  // Like Post
+  const handleLikePost = async (postId: string) => {
+    if (!currentUser) return;
+    try {
+      const res = await fetch(`/api/posts/${postId}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: currentUser.id })
+      });
+      if (res.ok) {
+        await fetchPosts();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Submit Comment
+  const handleAddComment = async (postId: string) => {
+    if (!currentUser || !postCommentText[postId]?.trim()) return;
+    try {
+      const res = await fetch(`/api/posts/${postId}/comment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: currentUser.id, text: postCommentText[postId] })
+      });
+      if (res.ok) {
+        setPostCommentText(prev => ({ ...prev, [postId]: "" }));
+        await fetchPosts();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Request Gemini AI Personal Report Analysis
+  const requestAiAnalysis = async () => {
+    if (!currentUser) return;
+    setIsGeneratingAi(true);
+    setAiReport("");
+
+    const loadingMessages = [
+      "최근 달리기 데이터를 집계하고 있습니다...",
+      "나주 동강 날씨와 달리기 흔적을 분석하는 중입니다...",
+      "어슬런 코치 AI가 주간 일정을 검토하고 격려를 작성하고 있어요...",
+      "마지막 꿀팁을 조율하는 중입니다. 조금만 기다려주세요!"
+    ];
+
+    let msgIdx = 0;
+    setAiLoadingMessage(loadingMessages[0]);
+    const msgInterval = setInterval(() => {
+      msgIdx = (msgIdx + 1) % loadingMessages.length;
+      setAiLoadingMessage(loadingMessages[msgIdx]);
+    }, 2500);
+
+    try {
+      const res = await fetch("/api/ai/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: currentUser.id })
+      });
+      const data = await res.json();
+      if (data.analysis) {
+        setAiReport(data.analysis);
+      }
+    } catch (e) {
+      console.error(e);
+      setAiReport("코치 분석을 가져오는 중 오류가 발생했습니다. 다시 시도해 주세요.");
+    } finally {
+      clearInterval(msgInterval);
+      setIsGeneratingAi(false);
+    }
+  };
+
+  // Visual Path Preview inside Feed cards using canvas instead of heavy leafelt instances for multiple items
+  const drawFeedPathCanvas = (canvas: HTMLCanvasElement | null, path: [number, number][] | undefined) => {
+    if (!canvas || !path || path.length === 0) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    // Draw background grid
+    ctx.strokeStyle = "#f1f5f9";
+    ctx.lineWidth = 1;
+    for (let i = 20; i < w; i += 20) {
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(w, i); ctx.stroke();
+    }
+
+    // Coordinates bounding box
+    const lats = path.map(p => p[0]);
+    const lngs = path.map(p => p[1]);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+
+    const latRange = maxLat - minLat || 0.001;
+    const lngRange = maxLng - minLng || 0.001;
+
+    // Project coordinates to fit canvas with padding
+    const padding = 20;
+    const project = (lat: number, lng: number) => {
+      const x = padding + ((lng - minLng) / lngRange) * (w - padding * 2);
+      // Invert Y for canvas
+      const y = h - (padding + ((lat - minLat) / latRange) * (h - padding * 2));
+      return { x, y };
+    };
+
+    // Draw track line
+    ctx.strokeStyle = "#22c55e"; // Energetic Green
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    ctx.beginPath();
+    const start = project(path[0][0], path[0][1]);
+    ctx.moveTo(start.x, start.y);
+
+    for (let i = 1; i < path.length; i++) {
+      const pt = project(path[i][0], path[i][1]);
+      ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.stroke();
+
+    // Draw start dot
+    ctx.fillStyle = "#e11d48"; // Rose Start
+    ctx.beginPath();
+    ctx.arc(start.x, start.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw end dot
+    const end = project(path[path.length - 1][0], path[path.length - 1][1]);
+    ctx.fillStyle = "#3b82f6"; // Blue end
+    ctx.beginPath();
+    ctx.arc(end.x, end.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  // Convert seconds to readable format (HH:MM:SS)
+  const formatTime = (totalSeconds: number) => {
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    return [
+      hrs > 0 ? hrs : null,
+      mins < 10 && hrs > 0 ? "0" + mins : mins,
+      secs < 10 ? "0" + secs : secs
+    ].filter(v => v !== null).join(":");
+  };
+
+  // Level badge generator
+  const getLevelColor = (level: number) => {
+    if (level < 3) return "bg-gray-100 text-gray-700";
+    if (level < 5) return "bg-emerald-100 text-emerald-800";
+    if (level < 7) return "bg-amber-100 text-amber-800 border border-amber-300";
+    return "bg-rose-100 text-rose-800 border-2 border-rose-400 font-extrabold animate-pulse";
+  };
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-tr from-emerald-950 via-slate-900 to-indigo-950 flex items-center justify-center p-4">
+        {/* Confetti also visible on login success transition */}
+        <AnimatePresence>
+          {showConfetti && (
+            <motion.div
+              initial={{ opacity: 0, y: -50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-emerald-500 to-lime-500 text-white font-extrabold px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 border border-lime-400"
+            >
+              <Sparkles className="animate-spin text-yellow-300" size={24} />
+              <span className="text-sm md:text-base">{confettiMessage}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {renderTeacherPasswordModal()}
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-xl bg-slate-900/80 backdrop-blur-xl border border-slate-700/60 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 text-slate-100"
+        >
+          {/* Header */}
+          <div className="text-center space-y-2">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-lime-400 flex items-center justify-center text-slate-950 shadow-xl shadow-emerald-900/30">
+              <Activity size={28} className="animate-pulse" />
+            </div>
+            <h2 className="text-2xl md:text-3xl font-black tracking-tight bg-gradient-to-r from-emerald-400 to-lime-300 bg-clip-text text-transparent">
+              어슬런데이 <span className="text-sm font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 align-middle">동강중</span>
+            </h2>
+            <p className="text-xs text-slate-400 font-medium">
+              나주동강중학교 전교생 러닝 클럽 • 달리기 인증 및 칭찬 스탬프
+            </p>
+          </div>
+
+          {/* Tab buttons for Grade / Guest selection */}
+          <div className="flex bg-slate-950 p-1.5 rounded-2xl gap-1 border border-slate-800 flex-wrap">
+            {[1, 2, 3].map((g) => (
+              <button
+                key={g}
+                onClick={() => setLoginGradeTab(g)}
+                className={`flex-1 min-w-[60px] py-2 text-xs font-black rounded-xl transition cursor-pointer ${
+                  loginGradeTab === g
+                    ? "bg-emerald-500 text-slate-950 shadow-md font-extrabold"
+                    : "text-slate-400 hover:text-slate-100"
+                }`}
+              >
+                {g}학년
+              </button>
+            ))}
+            <button
+              onClick={() => setLoginGradeTab("staff")}
+              className={`flex-1 min-w-[70px] py-2 text-xs font-black rounded-xl transition cursor-pointer ${
+                loginGradeTab === "staff"
+                  ? "bg-indigo-500 text-white shadow-md font-extrabold"
+                  : "text-slate-400 hover:text-slate-100"
+              }`}
+            >
+              🧑‍🏫 교직원
+            </button>
+            <button
+              onClick={() => setLoginGradeTab("guest")}
+              className={`flex-1 min-w-[70px] py-2 text-xs font-black rounded-xl transition cursor-pointer ${
+                loginGradeTab === "guest"
+                  ? "bg-slate-800 text-white shadow-md font-extrabold"
+                  : "text-slate-400 hover:text-slate-100"
+              }`}
+            >
+              👤 게스트
+            </button>
+          </div>
+
+          {/* Students Grid or Guest Input */}
+          <div className="min-h-[220px]">
+            {loginGradeTab !== "guest" ? (
+              <div className="space-y-3">
+                <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider flex justify-between items-center px-1">
+                  <span>
+                    {loginGradeTab === "staff"
+                      ? "교직원을 선택하세요 (가나다순)"
+                      : `${loginGradeTab}학년 학생을 선택하세요 (가나다순)`}
+                  </span>
+                  <span className="text-emerald-400 font-bold font-mono">
+                    {users.filter(u => u.grade === (loginGradeTab === "staff" ? 4 : loginGradeTab)).length}명 등록됨
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {[...users]
+                    .filter((u) => u.grade === (loginGradeTab === "staff" ? 4 : loginGradeTab))
+                    .sort((a, b) => a.name.localeCompare(b.name, "ko"))
+                    .map((student) => {
+                      const getStaffGreeting = (name: string) => {
+                        if (["교장", "행정실장", "교무행정사"].includes(name)) {
+                          return `${name}님`;
+                        }
+                        return `${name} 선생님`;
+                      };
+                      return (
+                        <button
+                          key={student.id}
+                          onClick={() => {
+                            localStorage.setItem("easurun_user_id", student.id);
+                            setCurrentUser(student);
+                            if (loginGradeTab === "staff") {
+                              speakText(`${getStaffGreeting(student.name)}, 어슬런데이에 오신 것을 환영합니다! 오늘 하루도 기분 좋게 뛰어보세요!`);
+                              triggerCelebration(`🧑‍🏫 교직원 ${getStaffGreeting(student.name)}으로 로그인되었습니다!`);
+                            } else {
+                              speakText(`${student.name} 학생, 어슬런데이에 오신 것을 환영합니다! 오늘 하루도 파이팅!`);
+                              triggerCelebration(`🏫 ${student.grade}학년 ${student.name} 학생으로 로그인되었습니다!`);
+                            }
+                          }}
+                          className={`p-3 border rounded-xl text-center transition cursor-pointer flex flex-col items-center justify-center gap-1 shadow-sm ${
+                            loginGradeTab === "staff"
+                              ? "bg-indigo-950/40 hover:bg-indigo-500 hover:text-white border-indigo-900 hover:border-indigo-400"
+                              : "bg-slate-800/60 hover:bg-emerald-500 hover:text-slate-950 border-slate-800 hover:border-emerald-400"
+                          }`}
+                        >
+                          <span className="text-sm font-black text-slate-100 hover:text-inherit">{student.name}</span>
+                          <span className="text-[9px] opacity-75 font-bold font-mono">
+                            Lv.{student.level} | {student.totalDistance}km
+                          </span>
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 max-w-sm mx-auto py-4">
+                <div className="space-y-1 text-center">
+                  <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-bold">
+                    GUEST PORTAL
+                  </span>
+                  <h4 className="text-sm font-black text-slate-200">외부 사용자 및 게스트 이름 입력</h4>
+                  <p className="text-[11px] text-slate-400">자신의 이름을 기입하면 스탬프 및 러닝 데이터를 별도 기록·저장할 수 있습니다.</p>
+                </div>
+                <input
+                  type="text"
+                  value={guestNameInput}
+                  onChange={(e) => setGuestNameInput(e.target.value)}
+                  placeholder="본인의 이름을 입력하세요 (예: 박민재)"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-white focus:ring-2 focus:ring-indigo-400 focus:outline-none placeholder:text-slate-600 text-center"
+                />
+                <button
+                  onClick={async () => {
+                    if (!guestNameInput.trim()) return;
+                    setIsLoggingInGuest(true);
+                    try {
+                      const res = await fetch("/api/users", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ name: guestNameInput.trim(), grade: 0 })
+                      });
+                      if (res.ok) {
+                        const user = await res.json();
+                        localStorage.setItem("easurun_user_id", user.id);
+                        setCurrentUser(user);
+                        fetchUsers(); // Refresh list
+                        speakText(`${user.name} 게스트님, 환영합니다! 어슬런데이에서 오늘 한번 멋지게 뛰어보세요.`);
+                        triggerCelebration(`👤 게스트 ${user.name}님으로 로그인되었습니다!`);
+                      }
+                    } catch (e) {
+                      console.error(e);
+                    } finally {
+                      setIsLoggingInGuest(false);
+                    }
+                  }}
+                  disabled={isLoggingInGuest || !guestNameInput.trim()}
+                  className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white font-black text-xs py-3 rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {isLoggingInGuest ? "입장 중..." : "게스트로 어슬런 시작하기 🏃‍♂️"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Teacher Bypass link */}
+          <div className="pt-4 border-t border-slate-800/80 flex justify-between items-center text-xs">
+            <span className="text-slate-500 font-bold">나주동강중학교 어슬런 관리시스템 v2.1</span>
+            <button
+              onClick={() => {
+                setShowTeacherPasswordModal(true);
+                setTeacherPasswordInput("");
+                setTeacherPasswordError("");
+              }}
+              className="text-slate-400 hover:text-emerald-400 font-black transition flex items-center gap-1 cursor-pointer"
+            >
+              🧑‍🏫 교사 관리실 바로가기
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-12 flex flex-col selection:bg-emerald-100">
+      
+      {/* Dynamic Celebration Modal Overlay */}
+      <AnimatePresence>
+        {showConfetti && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-emerald-500 to-lime-500 text-white font-extrabold px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 border border-lime-400"
+          >
+            <Sparkles className="animate-spin text-yellow-300" size={24} />
+            <span className="text-sm md:text-base">{confettiMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {renderTeacherPasswordModal()}
+
+      {/* Top Main Navigation Header */}
+      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm px-4 py-3">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-3">
+          
+          {/* Logo Vibe */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-lime-400 flex items-center justify-center text-white shadow-md shadow-emerald-200">
+              <Activity size={22} className="animate-pulse" />
+            </div>
+            <div>
+              <h1 className="text-xl font-black tracking-tight text-slate-900 font-sans flex items-center gap-1">
+                어슬런데이 <span className="text-emerald-500 text-xs px-2 py-0.5 rounded-full bg-emerald-100 border border-emerald-200 font-bold">동강중</span>
+              </h1>
+              <p className="text-xs text-slate-500 font-medium">나주동강중학교 전교생 & 교직원 러닝 클럽 🏃‍♂️</p>
+            </div>
+          </div>
+
+          {/* Active User session details and logout */}
+          <div className="flex items-center gap-2">
+            {currentUser && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-emerald-500 text-white text-xs font-black px-3 py-2 rounded-xl shadow-sm">
+                  <Smile size={14} />
+                  <span>{currentUser.name} {currentUser.id === "teacher" ? "" : "접속 중"}</span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-200 text-xs font-black px-2.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-1"
+                >
+                  <span>사용자 변경 (로그아웃)</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </header>
+
+      {/* Primary Tab Bar Menu */}
+      <div className="bg-slate-950 text-white py-1.5 px-2">
+        <div className="max-w-4xl mx-auto flex justify-between overflow-x-auto gap-1 no-scrollbar text-xs md:text-sm">
+          <button
+            id="tab_home"
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition font-bold shrink-0 ${tab === "home" ? "bg-emerald-500 text-slate-950 font-black shadow-lg" : "hover:bg-slate-900 text-slate-300"}`}
+            onClick={() => setTab("home")}
+          >
+            <Smile size={16} />
+            <span>어슬런 홈</span>
+          </button>
+          <button
+            id="tab_run"
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition font-bold shrink-0 ${tab === "run" ? "bg-emerald-500 text-slate-950 font-black shadow-lg animate-pulse" : "hover:bg-slate-900 text-slate-300"}`}
+            onClick={() => setTab("run")}
+          >
+            <Compass size={16} />
+            <span>실시간 GPS 러닝</span>
+          </button>
+          <button
+            id="tab_plan"
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition font-bold shrink-0 ${tab === "plan" ? "bg-emerald-500 text-slate-950 font-black shadow-lg" : "hover:bg-slate-900 text-slate-300"}`}
+            onClick={() => setTab("plan")}
+          >
+            <Clock size={16} />
+            <span>초보자 코칭플랜</span>
+          </button>
+          <button
+            id="tab_ranking"
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition font-bold shrink-0 ${tab === "ranking" ? "bg-emerald-500 text-slate-950 font-black shadow-lg" : "hover:bg-slate-900 text-slate-300"}`}
+            onClick={() => setTab("ranking")}
+          >
+            <Trophy size={16} />
+            <span>동강 랭킹</span>
+          </button>
+          <button
+            id="tab_feed"
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition font-bold shrink-0 ${tab === "feed" ? "bg-emerald-500 text-slate-950 font-black shadow-lg" : "hover:bg-slate-900 text-slate-300"}`}
+            onClick={() => setTab("feed")}
+          >
+            <Users size={16} />
+            <span>어슬런 피드</span>
+          </button>
+          <button
+            id="tab_report"
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition font-bold shrink-0 ${tab === "report" ? "bg-emerald-500 text-slate-950 font-black shadow-lg" : "hover:bg-slate-900 text-slate-300"}`}
+            onClick={() => setTab("report")}
+          >
+            <Award size={16} />
+            <span>건강 리포트</span>
+          </button>
+          <button
+            id="tab_teacher"
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition font-bold shrink-0 ${tab === "teacher" ? "bg-indigo-600 text-white font-black shadow-lg" : "hover:bg-slate-900 text-slate-300"}`}
+            onClick={() => {
+              if (currentUser?.id === "teacher") {
+                setTab("teacher");
+              } else {
+                setShowTeacherPasswordModal(true);
+                setTeacherPasswordInput("");
+                setTeacherPasswordError("");
+              }
+            }}
+          >
+            <Database size={16} />
+            <span className="flex items-center gap-0.5">교사 관리</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Container Content */}
+      <main className="max-w-4xl mx-auto px-4 mt-6 w-full flex-grow">
+        
+        {/* TAB 1: 어슬런 홈 */}
+        {tab === "home" && currentUser && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
+            {/* Dynamic Card Greeting */}
+            <div className="bg-gradient-to-r from-emerald-500 to-lime-500 text-slate-950 p-6 rounded-3xl shadow-lg border border-lime-300 relative overflow-hidden">
+              <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-10">
+                <Activity size={180} />
+              </div>
+              <div className="relative z-10 space-y-2">
+                <span className="text-xs font-extrabold bg-slate-950 text-emerald-400 px-3 py-1 rounded-full uppercase tracking-wider">
+                  TODAY RUNNING
+                </span>
+                <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+                  안녕, {currentUser.name}! 👟
+                </h2>
+                <p className="text-sm md:text-base font-bold opacity-90 max-w-lg leading-relaxed">
+                  오늘 나주 동강의 영산강 수변을 따라 기분 좋게 어슬렁 한 바퀴 달려볼까? 
+                  조금씩 달리다 보면 전교생 랭킹도 쑥쑥 오를 거야!
+                </p>
+                <div className="pt-3 flex flex-wrap gap-2 text-xs font-bold">
+                  <span className="bg-slate-950 text-white px-3 py-1.5 rounded-xl">
+                    🔥 누적 거리: {currentUser.totalDistance} km
+                  </span>
+                  <span className="bg-slate-950 text-white px-3 py-1.5 rounded-xl">
+                    💮 스탬프: {currentUser.stamps.length} 개 획득
+                  </span>
+                  <span className="bg-slate-950 text-white px-3 py-1.5 rounded-xl">
+                    ⭐ 소속: {getGradeLabel(currentUser.grade)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stamp Collection Board: Highly Requested for Student Motivation */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 flex items-center gap-1.5">
+                    💮 어슬런 스탬프 북 <span className="text-xs text-slate-400 font-bold">(동기부여 보드)</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">러닝 완료 및 미션 달성 시 스탬프를 가득 채우세요!</p>
+                </div>
+                <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+                  {currentUser.stamps.length} / 10 Stamp
+                </span>
+              </div>
+
+              {/* 10 Stamp Grid slots */}
+              <div className="grid grid-cols-5 md:grid-cols-10 gap-3">
+                {Array.from({ length: 10 }).map((_, idx) => {
+                  const isEarned = idx < currentUser.stamps.length;
+                  return (
+                    <div
+                      key={idx}
+                      className={`aspect-square rounded-2xl flex flex-col items-center justify-center relative transition border-2 ${
+                        isEarned
+                          ? "bg-rose-50 border-rose-300 text-rose-600 scale-105 shadow-sm"
+                          : "bg-slate-50 border-dashed border-slate-200 text-slate-300"
+                      }`}
+                    >
+                      {isEarned ? (
+                        <>
+                          <span className="text-xl md:text-2xl animate-bounce">💮</span>
+                          <span className="text-[9px] font-black absolute bottom-1 text-rose-500">참 잘했어요</span>
+                        </>
+                      ) : (
+                        <span className="text-xs font-bold text-slate-400">{idx + 1}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Grid Layout: Active Weekly Missions & Selected Badges */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+              {/* Weekly Missions */}
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
+                <div className="mb-4">
+                  <h3 className="text-base font-black text-slate-900 flex items-center gap-1.5">
+                    🎯 이번 주 어슬런 미션
+                  </h3>
+                  <p className="text-xs text-slate-500">목표 달성 시 클릭해 스탬프 도장을 획득하세요!</p>
+                </div>
+
+                <div className="space-y-3 flex-grow">
+                  {missions.map(mission => {
+                    // Check if criteria met
+                    let progress = 0;
+                    let isCompleted = false;
+
+                    if (mission.type === "distance") {
+                      progress = currentUser.totalDistance;
+                      isCompleted = progress >= mission.goal;
+                    } else if (mission.type === "count") {
+                      // Number of runs in activities for this user
+                      const runCount = activities.filter(a => a.userId === currentUser.id).length;
+                      progress = runCount;
+                      isCompleted = progress >= mission.goal;
+                    } else if (mission.type === "pace") {
+                      // Pace is complex; simulate success if user has level >= 4
+                      progress = currentUser.level;
+                      isCompleted = currentUser.level >= 4;
+                    }
+
+                    return (
+                      <div
+                        key={mission.id}
+                        className={`p-3.5 rounded-2xl border transition ${
+                          isCompleted ? "bg-emerald-50/50 border-emerald-200" : "bg-slate-50/80 border-slate-100"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="text-sm font-extrabold text-slate-800">{mission.title}</h4>
+                            <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{mission.description}</p>
+                          </div>
+                          <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                            +{mission.rewardStamp} Stamp
+                          </span>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="mt-3">
+                          <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
+                            <span>진행 상황</span>
+                            <span>{Math.min(progress, mission.goal).toFixed(1)} / {mission.goal} {mission.type === "count" ? "회" : "km"}</span>
+                          </div>
+                          <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                            <div
+                              className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min((progress / mission.goal) * 100, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Claim Stamp button */}
+                        {isCompleted && (
+                          <button
+                            onClick={() => claimMissionReward(mission.id)}
+                            className="mt-3 w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-1.5 rounded-xl text-xs shadow-sm transition"
+                          >
+                            💮 미션 완료 스탬프 도장 찍기
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Badges showcase preview */}
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="mb-4">
+                    <h3 className="text-base font-black text-slate-900 flex items-center gap-1.5">
+                      🏆 {currentUser.name}의 성취 배지
+                    </h3>
+                    <p className="text-xs text-slate-500">성장하면서 얻은 반짝이는 러닝 훈장들입니다.</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {Object.entries(BADGE_INFO).map(([key, value]) => {
+                      const isUnlocked = currentUser.badges.includes(key);
+                      return (
+                        <div
+                          key={key}
+                          className={`p-3 rounded-2xl border flex items-center gap-2.5 transition ${
+                            isUnlocked
+                              ? value.color
+                              : "bg-slate-50 border-slate-200 opacity-40 grayscale"
+                          }`}
+                        >
+                          <span className="text-2xl">{value.icon}</span>
+                          <div>
+                            <h4 className="text-xs font-black">{value.name}</h4>
+                            <p className="text-[9px] font-medium leading-tight mt-0.5">{value.desc}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-400">레벨을 올려 배지를 더 잠금 해제하세요!</span>
+                  <button
+                    onClick={() => setTab("report")}
+                    className="text-xs font-extrabold text-emerald-600 flex items-center gap-0.5 hover:underline"
+                  >
+                    <span>자세히 보기</span>
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </motion.div>
+        )}
+
+        {/* TAB 2: 실시간 Geolocation 러닝 */}
+        {tab === "run" && currentUser && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4 mb-4">
+                <div>
+                  <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                    <Compass className="text-emerald-500 animate-spin" size={24} />
+                    실시간 어슬런 GPS 러너
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    GPS를 켜고 안전하게 달려보세요. 실시간 경로를 지도에 선명하게 그려줍니다.
+                  </p>
+                </div>
+
+                {/* Tracking simulation toggle for standard desktop inside sandbox iframe */}
+                <div className="flex items-center gap-3 bg-slate-100 px-3 py-2 rounded-2xl border border-slate-200">
+                  <span className="text-xs font-black text-slate-700">📍 영산강 코스 시뮬레이터:</span>
+                  <button
+                    onClick={() => {
+                      if (isRunning) return;
+                      setGpsSimulated(!gpsSimulated);
+                    }}
+                    disabled={isRunning}
+                    className={`text-xs font-extrabold px-3 py-1 rounded-xl transition ${
+                      gpsSimulated
+                        ? "bg-emerald-500 text-slate-950 shadow-sm"
+                        : "bg-slate-200 text-slate-500"
+                    }`}
+                  >
+                    {gpsSimulated ? "시뮬레이터 활성" : "실제 GPS 활성"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Main Map Box */}
+              <div className="relative">
+                <div
+                  id="map-canvas-container"
+                  ref={mapContainerRef}
+                  className="w-full h-80 md:h-96 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden z-10"
+                />
+
+                {/* Live Stats Overlay during Run */}
+                {isRunning && (
+                  <div className="absolute top-4 left-4 z-20 bg-slate-950/90 backdrop-blur-md text-white p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3 min-w-[160px]">
+                    <div className="text-xs font-bold text-slate-400">실시간 데이터</div>
+                    <div>
+                      <div className="text-3xl font-black text-lime-400 font-mono tracking-tight">
+                        {runDistance.toFixed(3)} <span className="text-xs">km</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-bold mt-0.5">거리 측정</div>
+                    </div>
+                    <div>
+                      <div className="text-xl font-black font-mono">
+                        {formatTime(runDuration)}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-bold">시간</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Run Controller and Audio Coacher Control */}
+              <div className="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200/60">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                  
+                  {/* Voice Coacher Guide setup */}
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      onClick={() => setVoiceCoachingEnabled(!voiceCoachingEnabled)}
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center border transition ${
+                        voiceCoachingEnabled
+                          ? "bg-emerald-100 border-emerald-300 text-emerald-600 shadow-sm"
+                          : "bg-slate-100 border-slate-200 text-slate-400"
+                      }`}
+                    >
+                      {voiceCoachingEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                    </button>
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-800">보이스 코칭 동시 안내</h4>
+                      <p className="text-[10px] text-slate-500">Runday식 힘나는 음성 코칭을 들으며 달립니다.</p>
+                    </div>
+                  </div>
+
+                  {/* Core Action triggers */}
+                  <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                    {!isRunning ? (
+                      <button
+                        onClick={startRunning}
+                        className="w-full md:w-44 bg-gradient-to-r from-emerald-500 to-lime-500 text-slate-950 font-black py-3 px-6 rounded-2xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2"
+                      >
+                        <Play size={18} fill="currentColor" />
+                        <span>달리기 시작!</span>
+                      </button>
+                    ) : (
+                      <>
+                        {isPaused ? (
+                          <button
+                            onClick={resumeRunning}
+                            className="bg-emerald-500 text-slate-950 font-black py-2.5 px-5 rounded-2xl shadow-sm hover:bg-emerald-600 transition text-xs md:text-sm"
+                          >
+                            다시 계속하기
+                          </button>
+                        ) : (
+                          <button
+                            onClick={pauseRunning}
+                            className="bg-amber-500 text-slate-950 font-black py-2.5 px-5 rounded-2xl shadow-sm hover:bg-amber-600 transition text-xs md:text-sm"
+                          >
+                            일시 정지
+                          </button>
+                        )}
+                        <button
+                          onClick={stopRunningAndCleanup}
+                          className="bg-slate-200 text-slate-700 font-bold py-2.5 px-5 rounded-2xl shadow-sm hover:bg-slate-300 transition text-xs md:text-sm"
+                        >
+                          운동 포기
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Save Run Form: Unlocked after some running distance */}
+              {isRunning && runDistance >= 0.05 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="mt-6 border-t border-slate-100 pt-6 space-y-4"
+                >
+                  <div>
+                    <label className="block text-xs font-black text-slate-800 mb-1.5">
+                      ✏️ 오늘 러닝 완료 한마디 (피드 공유)
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white"
+                      placeholder="예) 오늘 영산강 바람 짱 시원하네! 미션 완료해서 기분 좋다!"
+                      value={runMemo}
+                      onChange={(e) => setRunMemo(e.target.value)}
+                    />
+                  </div>
+
+                  <button
+                    onClick={submitRunningRecord}
+                    disabled={isSubmittingRun}
+                    className="w-full bg-slate-950 hover:bg-slate-900 text-emerald-400 font-extrabold py-3.5 rounded-2xl shadow-md transition flex items-center justify-center gap-2"
+                  >
+                    {isSubmittingRun ? (
+                      <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <CheckCircle2 size={18} />
+                        <span>러닝 완주 & 피드 기록 제출하기</span>
+                      </>
+                    )}
+                  </button>
+                </motion.div>
+              )}
+
+            </div>
+          </motion.div>
+        )}
+
+        {/* TAB 3: 어슬런 플랜 & 보이스 코칭 */}
+        {tab === "plan" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
+            {/* Guide header */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <Volume2 className="text-emerald-500" size={24} />
+                초보자 맞춤형 단계별 러닝 플랜
+              </h2>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                달리기가 처음이신가요? 런데이 앱처럼 설계된 걷기-달리기 반복 훈련과 전문 AI 보이스 코칭으로 체력을 기르세요.
+              </p>
+            </div>
+
+            {/* Plan selection grid */}
+            <div className="space-y-6">
+              {RUNNING_PLANS.map(weekGroup => (
+                <div key={weekGroup.week} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
+                    <h3 className="text-base font-black text-slate-900 flex items-center gap-1.5">
+                      {weekGroup.week === 1 ? "🌱 초급 코스: 5분 연속 달리기 완성" : weekGroup.week === 2 ? "🏃‍♂️ 중급 코스: 30분 연속 달리기 도전" : "🔥 고급 코스: 60분 연속 달리기 정복"}
+                    </h3>
+                    <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full w-fit">
+                      {weekGroup.week === 1 ? "기초체력 기르기" : weekGroup.week === 2 ? "지구력 다지기" : "철인 체력 완성"}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {weekGroup.days.map(dayPlan => {
+                      const isActive = activeTraining?.week === weekGroup.week && activeTraining?.day === dayPlan.day;
+                      return (
+                        <div
+                          key={dayPlan.day}
+                          className={`p-4 rounded-2xl border transition flex flex-col justify-between ${
+                            isActive
+                              ? "bg-emerald-50 border-emerald-300 shadow-sm"
+                              : "bg-slate-50 border-slate-200 hover:border-slate-300"
+                          }`}
+                        >
+                          <div>
+                            <span className="text-[10px] font-black uppercase text-slate-400">Day {dayPlan.day}</span>
+                            <h4 className="text-sm font-extrabold text-slate-800 mt-0.5">{dayPlan.title}</h4>
+                            
+                            {/* Sequence preview details */}
+                            <div className="mt-2 space-y-1">
+                              {dayPlan.sequence.map((seq, i) => (
+                                <div key={i} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
+                                  <span className={`w-2 h-2 rounded-full ${
+                                    seq.type === "run" ? "bg-emerald-500" : seq.type === "walk" ? "bg-amber-400" : "bg-blue-400"
+                                  }`} />
+                                  <span>{seq.type === "run" ? "달리기" : seq.type === "walk" ? "걷기" : "워밍업"}: {seq.duration >= 60 ? `${seq.duration / 60}분` : `${seq.duration}초`}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between">
+                            {isActive && trainingActive ? (
+                              <button
+                                onClick={stopTrainingAndCleanup}
+                                className="w-full bg-rose-500 hover:bg-rose-600 text-white font-black py-2 rounded-xl text-xs transition"
+                              >
+                                트레이닝 중단
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => startTraining(weekGroup.week, dayPlan.day, dayPlan)}
+                                className="w-full bg-slate-950 hover:bg-slate-900 text-emerald-400 font-extrabold py-2 rounded-xl text-xs transition flex items-center justify-center gap-1"
+                              >
+                                <Play size={12} fill="currentColor" />
+                                <span>트레이닝 시작</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Active Training Dashboard overlay */}
+            {trainingActive && activeTraining && (
+              <motion.div
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-950 text-white p-5 rounded-3xl shadow-2xl border border-slate-800 max-w-lg w-11/12 space-y-4"
+              >
+                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                  <div>
+                    <span className="text-[10px] text-emerald-400 font-black tracking-widest">LIVE VOICE COACHING</span>
+                    <h3 className="text-sm font-black text-white">
+                      {activeTraining.week === 1 ? "🌱 초급 5분 코스" : activeTraining.week === 2 ? "🏃‍♂️ 중급 30분 코스" : "🔥 고급 60분 코스"} - {activeTraining.day}일차 훈련 중
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCoachingVolume(!coachingVolume)}
+                      className={`p-2 rounded-xl transition border ${
+                        coachingVolume ? "bg-slate-800 border-slate-700 text-emerald-400" : "bg-slate-900 border-slate-800 text-slate-500"
+                      }`}
+                    >
+                      {coachingVolume ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                    </button>
+                    <button
+                      onClick={stopTrainingAndCleanup}
+                      className="text-xs bg-rose-500 hover:bg-rose-600 text-white font-bold px-3 py-1.5 rounded-xl"
+                    >
+                      훈련 종료
+                    </button>
+                  </div>
+                </div>
+
+                {/* Training Timer circle or progress */}
+                <div className="flex items-center justify-center py-2">
+                  <div className="text-center">
+                    <div className="text-4xl font-mono font-black text-lime-400 tracking-tight">
+                      {trainingTimer} <span className="text-sm">초</span>
+                    </div>
+                    <div className="text-xs text-slate-400 font-bold mt-1">남은 시간</div>
+                  </div>
+                </div>
+
+                {/* Coach guidance note */}
+                <div className="bg-slate-900 p-3 rounded-2xl border border-slate-800">
+                  <p className="text-xs text-slate-300 font-medium italic text-center">
+                    📢 "{coachingText}"
+                  </p>
+                </div>
+                
+                {/* Simulated Audio Waves visual element */}
+                <div className="flex items-center justify-center gap-1 py-1">
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <motion.div
+                      key={i}
+                      animate={{ height: [8, Math.random() * 24 + 8, 8] }}
+                      transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.05 }}
+                      className="w-1 bg-emerald-500 rounded-full"
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+
+        {/* TAB 4: 동강 랭킹 리더보드 */}
+        {tab === "ranking" && currentUser && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
+            {/* Top 3 Podium visualization */}
+            <div className="bg-gradient-to-b from-slate-900 to-slate-950 text-white p-6 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden">
+              <div className="text-center mb-6">
+                <span className="text-[10px] font-black tracking-widest text-emerald-400 uppercase">LEADERBOARD</span>
+                <h2 className="text-xl font-black text-white mt-1">나주동강중학교 어슬런 명예의 전당 🥇</h2>
+                <p className="text-xs text-slate-400 mt-0.5">전교생 21명의 실시간 누적 거리 경쟁 현황입니다.</p>
+              </div>
+
+              {/* Podium display */}
+              <div className="flex justify-center items-end gap-3 pt-4 max-w-md mx-auto h-48">
+                
+                {/* 2nd place */}
+                {users.length > 1 && (
+                  <div className="flex flex-col items-center flex-1">
+                    <span className="text-sm font-black text-slate-300 truncate max-w-full">{users[1].name}</span>
+                    <span className="text-[10px] text-slate-400 font-bold">{users[1].totalDistance} km</span>
+                    <div className="w-full bg-slate-800 h-16 rounded-t-2xl flex flex-col items-center justify-center border-t-2 border-slate-400 mt-2 relative">
+                      <span className="text-2xl font-black text-slate-300 font-mono">2</span>
+                      <span className="text-[9px] font-bold text-slate-400 absolute bottom-1">silver</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 1st place */}
+                {users.length > 0 && (
+                  <div className="flex flex-col items-center flex-1">
+                    <div className="text-yellow-400 animate-bounce mb-1">👑</div>
+                    <span className="text-base font-black text-yellow-300 truncate max-w-full">{users[0].name}</span>
+                    <span className="text-xs text-yellow-200 font-extrabold">{users[0].totalDistance} km</span>
+                    <div className="w-full bg-gradient-to-b from-yellow-500/30 to-slate-800 h-24 rounded-t-2xl flex flex-col items-center justify-center border-t-4 border-yellow-400 mt-2 relative shadow-lg shadow-yellow-500/10">
+                      <span className="text-3xl font-black text-yellow-400 font-mono">1</span>
+                      <span className="text-[10px] font-bold text-yellow-300 absolute bottom-1">GOLD</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3rd place */}
+                {users.length > 2 && (
+                  <div className="flex flex-col items-center flex-1">
+                    <span className="text-sm font-black text-amber-600 truncate max-w-full">{users[2].name}</span>
+                    <span className="text-[10px] text-amber-500 font-bold">{users[2].totalDistance} km</span>
+                    <div className="w-full bg-slate-800 h-12 rounded-t-2xl flex flex-col items-center justify-center border-t-2 border-amber-600 mt-2 relative">
+                      <span className="text-xl font-black text-amber-600 font-mono">3</span>
+                      <span className="text-[9px] font-bold text-amber-500 absolute bottom-1">bronze</span>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+
+            {/* Complete Leaderboard list */}
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+                <h3 className="text-sm font-black text-slate-900">전체 러닝 랭킹 목록 (전교생 & 교직원)</h3>
+                <span className="text-xs text-slate-500 font-bold">누적 달리기 거리 기준</span>
+              </div>
+
+              <div className="divide-y divide-slate-100">
+                {users.map((user, idx) => {
+                  const isCurrent = user.id === currentUser.id;
+                  const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`;
+
+                  return (
+                    <div
+                      key={user.id}
+                      className={`p-4 flex items-center justify-between transition ${
+                        isCurrent ? "bg-amber-50/50 border-l-4 border-amber-500" : "hover:bg-slate-50/50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        
+                        {/* Medal index */}
+                        <div className="w-8 text-center font-mono font-black text-sm text-slate-600">
+                          {medal}
+                        </div>
+
+                        {/* Student Detail */}
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-extrabold text-slate-800 text-sm">{user.name}</span>
+                            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                              {getGradeLabel(user.grade)}
+                            </span>
+                            {isCurrent && (
+                              <span className="text-[9px] font-extrabold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full animate-pulse">
+                                나
+                              </span>
+                            )}
+                          </div>
+                          
+                          {/* Badges and milestones */}
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${getLevelColor(user.level)}`}>
+                              Lv.{user.level}
+                            </span>
+                            {user.badges.slice(0, 3).map(b => (
+                              <span key={b} className="text-[10px]" title={BADGE_INFO[b]?.name}>
+                                {BADGE_INFO[b]?.icon}
+                              </span>
+                            ))}
+                          </div>
+
+                        </div>
+                      </div>
+
+                      {/* Distance metric */}
+                      <div className="text-right">
+                        <div className="text-sm font-extrabold text-slate-900 font-mono">
+                          {user.totalDistance} <span className="text-xs text-slate-400">km</span>
+                        </div>
+                        <div className="text-[9px] font-bold text-slate-400 mt-0.5">
+                          스탬프 {user.stamps.length}개
+                        </div>
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* TAB 5: 어슬런 소셜 피드 */}
+        {tab === "feed" && currentUser && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
+            {/* Create manual post form */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+              <form onSubmit={handleCreatePost} className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-slate-950 font-black text-xs">
+                    {currentUser.name[0]}
+                  </div>
+                  <span className="text-xs font-black text-slate-800">
+                    {currentUser.name} 학생으로 게시글 쓰기
+                  </span>
+                </div>
+
+                <textarea
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white resize-none"
+                  rows={3}
+                  placeholder="예) 오늘 영산강교차로에서 바람 장난 아니네요! 다들 달리기 가요!"
+                  value={newPostText}
+                  onChange={(e) => setNewPostText(e.target.value)}
+                />
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="bg-slate-950 hover:bg-slate-900 text-emerald-400 font-extrabold px-4 py-2 rounded-xl text-xs flex items-center gap-1 shadow-sm transition"
+                  >
+                    <Send size={12} />
+                    <span>글 게시하기</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Shared feed posts */}
+            <div className="space-y-6">
+              {posts.map(post => {
+                const isLiked = post.likes.includes(currentUser.id);
+                return (
+                  <div key={post.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                    
+                    {/* Post Header */}
+                    <div className="p-4 flex justify-between items-center border-b border-slate-50">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 text-slate-700 font-black text-xs">
+                          {post.userName[0]}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-extrabold text-slate-800">{post.userName}</span>
+                            <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                              {post.grade}학년
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-slate-400 font-bold">{new Date(post.date).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+
+                      {post.isRunRecord && (
+                        <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full flex items-center gap-1">
+                          ⚡ 러닝 인증
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Post Body Content */}
+                    <div className="p-5 space-y-4">
+                      <p className="text-xs md:text-sm text-slate-700 font-medium whitespace-pre-wrap leading-relaxed">
+                        {post.content}
+                      </p>
+
+                      {/* If linked to running activity path - Render Canvas View */}
+                      {post.isRunRecord && post.path && post.path.length > 0 && (
+                        <div className="bg-slate-50 rounded-2xl border border-slate-200/50 p-4 flex flex-col md:flex-row gap-4 items-center">
+                          
+                          {/* Miniature Map Visualized on Canvas */}
+                          <div className="relative overflow-hidden w-full md:w-48 h-32 rounded-xl bg-slate-100 flex-shrink-0">
+                            <canvas
+                              ref={el => {
+                                if (el) drawFeedPathCanvas(el, post.path);
+                              }}
+                              width={240}
+                              height={160}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute top-1.5 left-1.5 bg-slate-900/80 text-[8px] font-black text-white px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                              <MapPin size={8} />
+                              <span>나주 동강 코스</span>
+                            </div>
+                          </div>
+
+                          {/* Running stats summary */}
+                          <div className="grid grid-cols-3 gap-3 w-full text-center">
+                            <div className="p-2.5 rounded-xl bg-white border border-slate-100">
+                              <div className="text-xs font-black text-slate-400">거리</div>
+                              <div className="text-base font-extrabold text-slate-800 font-mono tracking-tight mt-0.5">
+                                {post.distance} <span className="text-[10px]">km</span>
+                              </div>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-white border border-slate-100">
+                              <div className="text-xs font-black text-slate-400">시간</div>
+                              <div className="text-base font-extrabold text-slate-800 font-mono tracking-tight mt-0.5">
+                                {post.duration ? formatTime(post.duration) : "0:00"}
+                              </div>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-white border border-slate-100">
+                              <div className="text-xs font-black text-slate-400">페이스</div>
+                              <div className="text-base font-extrabold text-slate-800 font-mono tracking-tight mt-0.5">
+                                {post.pace || "6:00"}
+                              </div>
+                            </div>
+                          </div>
+
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Likes & Comments bar */}
+                    <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex gap-4 items-center text-xs text-slate-600 font-bold">
+                      <button
+                        onClick={() => handleLikePost(post.id)}
+                        className={`flex items-center gap-1 px-2 py-1 rounded-lg transition hover:bg-slate-100 ${
+                          isLiked ? "text-rose-600" : ""
+                        }`}
+                      >
+                        <Heart size={15} fill={isLiked ? "currentColor" : "none"} />
+                        <span>응원 {post.likes.length}</span>
+                      </button>
+                      
+                      <div className="flex items-center gap-1">
+                        <MessageSquare size={15} />
+                        <span>댓글 {post.comments.length}</span>
+                      </div>
+                    </div>
+
+                    {/* Comments section */}
+                    <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-3">
+                      {post.comments.map(comment => (
+                        <div key={comment.id} className="text-xs leading-relaxed flex items-start gap-1.5">
+                          <span className="font-extrabold text-slate-800 whitespace-nowrap">{comment.userName}:</span>
+                          <span className="text-slate-600 font-medium">{comment.text}</span>
+                        </div>
+                      ))}
+
+                      {/* Comment input form */}
+                      <div className="flex gap-2 pt-2 border-t border-slate-100/60">
+                        <input
+                          type="text"
+                          className="flex-grow bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                          placeholder="응원 댓글을 한 줄 적어주세요..."
+                          value={postCommentText[post.id] || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPostCommentText(prev => ({ ...prev, [post.id]: val }));
+                          }}
+                        />
+                        <button
+                          onClick={() => handleAddComment(post.id)}
+                          className="bg-slate-950 text-emerald-400 text-xs font-bold px-3 py-1.5 rounded-xl hover:bg-slate-900 transition"
+                        >
+                          등록
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* TAB 6: 건강 리포트 & AI 분석 */}
+        {tab === "report" && currentUser && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
+            {/* Visual Stats Summary */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+              <h2 className="text-xl font-black text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-4">
+                <TrendingUp className="text-emerald-500" size={24} />
+                {currentUser.name}의 어슬런 건강 분석 대시보드
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-lime-50 border border-emerald-100">
+                  <div className="text-slate-500 text-xs font-black">누적 어슬런 거리</div>
+                  <div className="text-3xl font-black text-slate-900 font-mono tracking-tight mt-1">
+                    {currentUser.totalDistance} <span className="text-sm">km</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-bold mt-1.5">동강중 운동장 약 {Math.round(currentUser.totalDistance * 5)}바퀴</p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-lime-50 border border-emerald-100">
+                  <div className="text-slate-500 text-xs font-black">누적 운동 시간</div>
+                  <div className="text-3xl font-black text-slate-900 font-mono tracking-tight mt-1">
+                    {Math.round(currentUser.totalDuration / 60)} <span className="text-sm">분</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-bold mt-1.5">지속 체력 훈련 완수</p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-lime-50 border border-emerald-100">
+                  <div className="text-slate-500 text-xs font-black">획득 스탬프 도장</div>
+                  <div className="text-3xl font-black text-slate-900 font-mono tracking-tight mt-1">
+                    {currentUser.stamps.length} <span className="text-sm">개</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-bold mt-1.5">스탬프 수집률 {(currentUser.stamps.length * 10)}% 돌파</p>
+                </div>
+              </div>
+
+              {/* Progress Level wheel representation */}
+              <div className="p-5 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-full bg-slate-900 text-emerald-400 flex items-center justify-center text-xl font-black border-2 border-emerald-400 shadow-md">
+                    Lv.{currentUser.level}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800">어슬런 마스터 레벨 {currentUser.level}</h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                      5km를 달릴 때마다 레벨이 1개씩 성장하며 몸집이 튼튼해집니다.
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right w-full md:w-auto">
+                  <div className="text-xs text-slate-500 font-bold mb-1">다음 레벨까지 남은 거리</div>
+                  <div className="text-sm font-extrabold text-slate-900 font-mono">
+                    {((currentUser.level * 5) - currentUser.totalDistance).toFixed(1)} km
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* AI Coaching Report Section powered by Gemini 3.5-flash */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="text-base font-black text-slate-900 flex items-center gap-1.5">
+                    🤖 전문 AI 코칭 데이터 리포트
+                  </h3>
+                  <p className="text-xs text-slate-500">Gemini가 학생의 누적 달리기 데이터를 분석하고 일대일 코칭을 건넵니다.</p>
+                </div>
+
+                <button
+                  onClick={requestAiAnalysis}
+                  disabled={isGeneratingAi}
+                  className="bg-slate-950 hover:bg-slate-900 text-emerald-400 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-1 shadow-md transition disabled:opacity-50"
+                >
+                  <Sparkles size={13} />
+                  <span>AI 분석 신청하기</span>
+                </button>
+              </div>
+
+              {/* AI Report output screen */}
+              {isGeneratingAi ? (
+                <div className="p-8 text-center flex flex-col items-center justify-center space-y-3">
+                  <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs font-black text-slate-600 animate-pulse">{aiLoadingMessage}</p>
+                </div>
+              ) : aiReport ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="prose prose-sm prose-slate max-w-none text-xs md:text-sm bg-emerald-50/40 p-5 rounded-2xl border border-emerald-100 leading-relaxed font-medium text-slate-700 whitespace-pre-wrap space-y-3"
+                >
+                  {aiReport}
+                </motion.div>
+              ) : (
+                <div className="p-8 border border-dashed border-slate-200 rounded-2xl text-center text-slate-400 flex flex-col items-center justify-center">
+                  <span className="text-3xl mb-1.5">⚡</span>
+                  <p className="text-xs font-black text-slate-600">위 버튼을 눌러 AI 코치의 일대일 러닝 진단서와 응원 보고서를 받아보세요!</p>
+                </div>
+              )}
+            </div>
+
+            {/* Badge wall detail showcase */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <h3 className="text-base font-black text-slate-900 mb-4 flex items-center gap-1.5">
+                🏆 어슬런 성취 배지 전시장
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(BADGE_INFO).map(([key, value]) => {
+                  const isUnlocked = currentUser.badges.includes(key);
+                  return (
+                    <div
+                      key={key}
+                      className={`p-4 rounded-2xl border flex items-start gap-4 transition ${
+                        isUnlocked
+                          ? value.color + " shadow-sm scale-102"
+                          : "bg-slate-50 border-slate-200 opacity-30 grayscale"
+                      }`}
+                    >
+                      <span className="text-3xl p-2 bg-white rounded-xl shadow-sm">{value.icon}</span>
+                      <div>
+                        <h4 className="text-xs md:text-sm font-black text-slate-800">{value.name}</h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{value.desc}</p>
+                        <span className="text-[9px] font-extrabold mt-2 inline-block text-emerald-600">
+                          {isUnlocked ? "✅ 잠금해제 완료" : "🔒 도전 과제 미달성"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* TAB 7: 교사 대시보드 */}
+        {tab === "teacher" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6 animate-fade-in"
+          >
+            {/* 1. School-wide Aggregate Statistics Card */}
+            <div className="bg-gradient-to-tr from-indigo-900 to-indigo-950 text-white p-6 rounded-3xl shadow-xl border border-indigo-800 relative overflow-hidden">
+              <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-5">
+                <Database size={180} />
+              </div>
+              <div className="relative z-10 space-y-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] font-extrabold bg-indigo-500 text-white px-2.5 py-1 rounded-full uppercase tracking-wider">
+                      TEACHER / COACH DASHBOARD
+                    </span>
+                    <h2 className="text-xl md:text-2xl font-black mt-2">
+                      나주동강중학교 어슬런데이 교사 관리실 🧑‍🏫
+                    </h2>
+                    <p className="text-xs text-indigo-200 mt-1">
+                      우리 학교 21명 학생들의 누적 달리기 정보와 활동 스탬프를 확인하고 격려의 편지를 보냅니다.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Grid stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                  <div className="bg-indigo-950/40 border border-indigo-700/50 p-3 rounded-2xl text-center">
+                    <div className="text-indigo-300 text-[10px] font-black">총 누적 달리기 거리</div>
+                    <div className="text-xl md:text-2xl font-black font-mono mt-1 text-emerald-400">
+                      {users.reduce((acc, u) => acc + u.totalDistance, 0).toFixed(1)} <span className="text-[10px] text-white">km</span>
+                    </div>
+                  </div>
+                  <div className="bg-indigo-950/40 border border-indigo-700/50 p-3 rounded-2xl text-center">
+                    <div className="text-indigo-300 text-[10px] font-black">학생 평균 달리기 거리</div>
+                    <div className="text-xl md:text-2xl font-black font-mono mt-1 text-emerald-400">
+                      {users.length > 0 ? (users.reduce((acc, u) => acc + u.totalDistance, 0) / users.length).toFixed(1) : 0} <span className="text-[10px] text-white">km</span>
+                    </div>
+                  </div>
+                  <div className="bg-indigo-950/40 border border-indigo-700/50 p-3 rounded-2xl text-center">
+                    <div className="text-indigo-300 text-[10px] font-black">수여된 총 스탬프 수</div>
+                    <div className="text-xl md:text-2xl font-black font-mono mt-1 text-amber-400">
+                      {users.reduce((acc, u) => acc + u.stamps.length, 0)} <span className="text-[10px] text-white">개</span>
+                    </div>
+                  </div>
+                  <div className="bg-indigo-950/40 border border-indigo-700/50 p-3 rounded-2xl text-center">
+                    <div className="text-indigo-300 text-[10px] font-black">학교 평균 러닝 레벨</div>
+                    <div className="text-xl md:text-2xl font-black font-mono mt-1 text-sky-300">
+                      Lv.{(users.reduce((acc, u) => acc + u.level, 0) / users.length).toFixed(1)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Praise and Stamp reward Card Form */}
+            <div id="teacher_award_form_section" className="bg-white p-6 rounded-3xl border border-indigo-200 shadow-sm space-y-4">
+              <div>
+                <h3 className="text-base font-black text-slate-900 flex items-center gap-1.5">
+                  💮 학생 격려 및 칭찬 스탬프 보내기
+                </h3>
+                <p className="text-xs text-slate-500">학생의 노력을 칭찬하고 격려 카드를 피드에 공개 발행하여 동기를 극대화합니다.</p>
+              </div>
+
+              <form onSubmit={handleTeacherAward} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Select Student */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 mb-1.5">칭찬할 학생 선택</label>
+                    <select
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+                      value={selectedTeacherStudentId}
+                      onChange={(e) => setSelectedTeacherStudentId(e.target.value)}
+                      required
+                    >
+                      <option value="">-- 격려할 학생을 선택하세요 (21명) --</option>
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>
+                          {u.grade}학년 - {u.name} (누적 {u.totalDistance}km | 스탬프 {u.stamps.length}개)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Stamp reward count */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 mb-1.5">선물할 칭찬 스탬프 개수</label>
+                    <div className="flex gap-2">
+                      {[1, 2, 3].map(count => (
+                        <button
+                          key={count}
+                          type="button"
+                          className={`flex-1 py-1.5 text-xs font-black rounded-xl border transition ${
+                            teacherStampsCount === count
+                              ? "bg-amber-100 border-amber-400 text-amber-800 shadow-sm"
+                              : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                          }`}
+                          onClick={() => setTeacherStampsCount(count)}
+                        >
+                          💮 +{count} 도장
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Praise Memo */}
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="block text-xs font-black text-slate-500">담임 선생님의 따뜻한 격려 한마디</label>
+                    <span className="text-[10px] text-indigo-600 font-bold">발행 시 어슬런 피드에 실시간 공유됩니다.</span>
+                  </div>
+                  <textarea
+                    className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-3 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-indigo-400 focus:outline-none h-20 placeholder:text-slate-400"
+                    placeholder="예: 어제 영산강 데크길을 따라 페이스를 조절해가며 완주해낸 끈기를 칭찬합니다! 조금씩 자라나는 체력이 참 멋집니다."
+                    value={teacherMemoText}
+                    onChange={(e) => setTeacherMemoText(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingTeacherAward || !selectedTeacherStudentId}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-md transition disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <span>📬 칭찬 편지 & 스탬프 발송하기</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* 3. Student Overall Progress Directory */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                <div>
+                  <h3 className="text-base font-black text-slate-900 flex items-center gap-1.5">
+                    📊 동강중학교 전교생 (21명) 어슬런 현황판
+                  </h3>
+                  <p className="text-xs text-slate-500">각 학생의 누적 달리기 통계와 레벨, 획득 뱃지 현황입니다.</p>
+                </div>
+                <span className="text-xs font-extrabold px-3 py-1 bg-slate-100 text-slate-700 rounded-full">
+                  전체 21명 등록 완료
+                </span>
+              </div>
+
+              {/* Grid representation instead of boring table */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {users.map(u => {
+                  return (
+                    <div
+                      key={u.id}
+                      className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 flex flex-col justify-between hover:border-indigo-300 transition"
+                    >
+                      <div>
+                        {/* Grade and Name */}
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-black bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-md">
+                              {u.grade}학년
+                            </span>
+                            <span className="text-sm font-black text-slate-900">{u.name}</span>
+                          </div>
+                          <span className="text-[11px] font-extrabold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+                            Lv.{u.level}
+                          </span>
+                        </div>
+
+                        {/* Distance & time */}
+                        <div className="grid grid-cols-2 gap-2 mt-3 text-center bg-white p-2 rounded-xl border border-slate-100">
+                          <div>
+                            <div className="text-[9px] font-black text-slate-400">누적 거리</div>
+                            <div className="text-xs font-black text-slate-800 font-mono mt-0.5">{u.totalDistance} km</div>
+                          </div>
+                          <div>
+                            <div className="text-[9px] font-black text-slate-400">보유 스탬프</div>
+                            <div className="text-xs font-black text-slate-800 font-mono mt-0.5">💮 {u.stamps.length}개</div>
+                          </div>
+                        </div>
+
+                        {/* Badges unlocked */}
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {u.badges.map(badgeId => {
+                            const badge = BADGE_INFO[badgeId as keyof typeof BADGE_INFO];
+                            return badge ? (
+                              <span
+                                key={badgeId}
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200"
+                                title={badge.name}
+                              >
+                                {badge.icon} {badge.name}
+                              </span>
+                            ) : null;
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="mt-4 pt-3 border-t border-slate-200/60 flex justify-end">
+                        <button
+                          type="button"
+                          className="text-[10px] font-black bg-indigo-950 text-emerald-400 px-2.5 py-1.5 rounded-xl hover:bg-slate-900 transition flex items-center gap-1"
+                          onClick={() => {
+                            setSelectedTeacherStudentId(u.id);
+                            // Scroll to form
+                            const formElement = document.getElementById("teacher_award_form_section");
+                            if (formElement) {
+                              formElement.scrollIntoView({ behavior: "smooth" });
+                            }
+                          }}
+                        >
+                          <Smile size={10} />
+                          <span>이 학생 칭찬하기</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 4. Student activity running logs */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <div>
+                <h3 className="text-base font-black text-slate-900 flex items-center gap-1.5">
+                  📁 전교생 최근 어슬런 활동 원본 로그
+                </h3>
+                <p className="text-xs text-slate-500">학생들이 실시간 GPS 어플로 완주 후 서버에 업로드한 기록입니다.</p>
+              </div>
+
+              <div className="space-y-4">
+                {activities.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 text-xs font-bold border border-dashed border-slate-200 rounded-2xl">
+                    아직 업로드된 학생 활동 기록이 없습니다.
+                  </div>
+                ) : (
+                  activities.map(act => (
+                    <div key={act.id} className="border border-slate-100 bg-slate-50/50 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                      <div className="space-y-2 flex-grow">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                            {act.grade}학년 - {act.userName}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-bold">
+                            {new Date(act.date).toLocaleDateString("ko-KR")} {new Date(act.date).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold text-slate-800 leading-relaxed">
+                          💬 "{act.memo}"
+                        </p>
+                        <div className="flex gap-4 text-xs font-mono font-bold text-slate-600 pt-1">
+                          <span>🏃‍♂️ 거리: {act.distance}km</span>
+                          <span>⏱️ 시간: {formatTime(act.duration)}</span>
+                          <span>⚡ 페이스: {act.pace}/km</span>
+                        </div>
+                      </div>
+
+                      {/* Map coordinate drawing mini icon */}
+                      {act.path && act.path.length > 0 && (
+                        <div className="relative overflow-hidden w-28 h-20 rounded-xl bg-white border border-slate-200 flex-shrink-0 self-end md:self-center">
+                          <canvas
+                            ref={el => {
+                              if (el) drawFeedPathCanvas(el, act.path);
+                            }}
+                            width={112}
+                            height={80}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+      </main>
+
+      {/* Humble credit in page footer */}
+      <footer className="text-center py-8 text-[11px] text-slate-400 font-bold max-w-4xl mx-auto border-t border-slate-200 mt-12 w-11/12 space-y-1">
+        <div>어슬런데이 - 전라남도 나주시 동강면 동강중학교 건강 문화 달리기 프로젝트</div>
+        <div className="text-slate-300 font-medium">Developed for 21 outstanding students of Naju Donggang Middle School</div>
+      </footer>
+
+    </div>
+  );
+}
