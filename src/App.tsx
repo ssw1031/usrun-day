@@ -27,9 +27,38 @@ import {
   Send,
   Plus
 } from "lucide-react";
+import {
+  DEFAULT_USERS,
+  DEFAULT_MISSIONS,
+  DEFAULT_ACTIVITIES,
+  DEFAULT_POSTS
+} from "./defaults";
 
 // For Leaflet map loading via CDN
 declare const L: any;
+
+const getLocalDB = () => {
+  const data = localStorage.getItem("easurun_local_db");
+  if (data) {
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  const initial = {
+    users: DEFAULT_USERS,
+    activities: DEFAULT_ACTIVITIES,
+    posts: DEFAULT_POSTS,
+    missions: DEFAULT_MISSIONS
+  };
+  localStorage.setItem("easurun_local_db", JSON.stringify(initial));
+  return initial;
+};
+
+const saveLocalDB = (db: any) => {
+  localStorage.setItem("easurun_local_db", JSON.stringify(db));
+};
 
 interface UserProfile {
   id: string;
@@ -304,71 +333,84 @@ export default function App() {
     fetchMissions();
   }, []);
 
+  const syncCurrentUser = (usersList: UserProfile[]) => {
+    const savedUserId = localStorage.getItem("easurun_user_id");
+    if (savedUserId) {
+      if (savedUserId === "teacher") {
+        setCurrentUser({
+          id: "teacher",
+          name: "담임 선생님",
+          grade: 0,
+          totalDistance: 0,
+          totalDuration: 0,
+          level: 10,
+          stamps: [],
+          badges: []
+        });
+        setTab("teacher");
+        return;
+      }
+
+      const savedUser = usersList.find((u: any) => u.id === savedUserId);
+      if (savedUser) {
+        setCurrentUser(savedUser);
+        return;
+      }
+    }
+    setCurrentUser(null);
+  };
+
   const fetchUsers = async () => {
     try {
       const res = await fetch("/api/users");
+      if (!res.ok) throw new Error("API failed");
       const data = await res.json();
       setUsers(data);
-      
-      const savedUserId = localStorage.getItem("easurun_user_id");
-      if (savedUserId) {
-        // Teacher session fallback
-        if (savedUserId === "teacher") {
-          setCurrentUser({
-            id: "teacher",
-            name: "담임 선생님",
-            grade: 0,
-            totalDistance: 0,
-            totalDuration: 0,
-            level: 10,
-            stamps: [],
-            badges: []
-          });
-          setTab("teacher");
-          return;
-        }
-
-        const savedUser = data.find((u: any) => u.id === savedUserId);
-        if (savedUser) {
-          setCurrentUser(savedUser);
-          return;
-        }
-      }
-      
-      // No logged in user -> show login screen
-      setCurrentUser(null);
+      syncCurrentUser(data);
     } catch (e) {
-      console.error(e);
+      console.warn("Using offline user database fallback:", e);
+      const db = getLocalDB();
+      setUsers(db.users);
+      syncCurrentUser(db.users);
     }
   };
 
   const fetchActivities = async () => {
     try {
       const res = await fetch("/api/activities");
+      if (!res.ok) throw new Error("API failed");
       const data = await res.json();
       setActivities(data);
     } catch (e) {
-      console.error(e);
+      console.warn("Using offline activities database fallback:", e);
+      const db = getLocalDB();
+      setActivities(db.activities);
     }
   };
 
   const fetchPosts = async () => {
     try {
       const res = await fetch("/api/posts");
+      if (!res.ok) throw new Error("API failed");
       const data = await res.json();
       setPosts(data);
     } catch (e) {
-      console.error(e);
+      console.warn("Using offline posts database fallback:", e);
+      const db = getLocalDB();
+      setPosts(db.posts);
     }
   };
 
   const fetchMissions = async () => {
     try {
       const res = await fetch("/api/missions");
+      if (!res.ok) throw new Error("API failed");
       const data = await res.json();
       setMissions(data);
     } catch (e) {
-      console.error(e);
+      console.warn("Using offline missions database fallback:", e);
+      const db = getLocalDB();
+      setMissions(db.missions);
     }
   };
 
@@ -712,21 +754,91 @@ export default function App() {
         })
       });
 
-      if (response.ok) {
+      if (!response.ok) throw new Error("API failed");
+
+      speakText(`어슬런데이 완주를 축하합니다! ${runDistance} 킬로미터를 기록하여 발도장 스탬프 한 개가 적립되었습니다.`);
+      triggerCelebration(`🎉 어슬런데이 완주! ${runDistance}km 기록! 스탬프 획득 완료!`);
+
+      // Refresh lists
+      await fetchUsers();
+      await fetchActivities();
+      await fetchPosts();
+
+      // Stop running and switch to Feed
+      stopRunningAndCleanup();
+      setTab("feed");
+    } catch (e) {
+      console.warn("Using offline database save fallback for running activity:", e);
+      const db = getLocalDB();
+      const userIndex = db.users.findIndex(u => u.id === currentUser.id);
+      if (userIndex !== -1) {
+        const user = db.users[userIndex];
+        const dKm = parseFloat(runDistance.toFixed(2));
+        const dSec = runDuration;
+
+        // Add activity
+        const activityId = `act-${Date.now()}`;
+        const newActivity = {
+          id: activityId,
+          userId: user.id,
+          userName: user.name,
+          grade: user.grade,
+          date: new Date().toISOString(),
+          distance: dKm,
+          duration: dSec,
+          pace: finalPace,
+          memo: runMemo || "어슬런데이 달리기 완료!",
+          path: runPath,
+          stampsEarned: 1
+        };
+        db.activities.unshift(newActivity);
+
+        // Update stats
+        user.totalDistance = parseFloat((user.totalDistance + dKm).toFixed(2));
+        user.totalDuration += dSec;
+        user.stamps.push(`stamp-${Date.now()}`);
+
+        // Badges
+        if (!user.badges.includes("first-run")) user.badges.push("first-run");
+        if (user.totalDistance >= 10 && !user.badges.includes("distance-10")) user.badges.push("distance-10");
+        if (user.totalDistance >= 30 && !user.badges.includes("marathon-club")) user.badges.push("marathon-club");
+        if (user.totalDistance >= 50 && !user.badges.includes("legend")) user.badges.push("legend");
+
+        // Level
+        const calculatedLevel = Math.floor(user.totalDistance / 5) + 1;
+        if (calculatedLevel > user.level) user.level = calculatedLevel;
+
+        // Create social post
+        const postContent = `🏃‍♂️ ${user.name}님이 어슬런데이 달리기를 완주했습니다! \n✨ 거리: ${dKm}km | 시간: ${Math.floor(dSec / 60)}분 ${dSec % 60}초 | 페이스: ${finalPace}/km\n💬 한마디: "${newActivity.memo}"`;
+        const newPost = {
+          id: `post-${Date.now()}`,
+          userId: user.id,
+          userName: user.name,
+          grade: user.grade,
+          content: postContent,
+          distance: dKm,
+          duration: dSec,
+          pace: finalPace,
+          path: runPath,
+          likes: [],
+          comments: [],
+          date: new Date().toISOString(),
+          isRunRecord: true
+        };
+        db.posts.unshift(newPost);
+
+        saveLocalDB(db);
+        setCurrentUser(user);
+        setUsers(db.users);
+        setActivities(db.activities);
+        setPosts(db.posts);
+
         speakText(`어슬런데이 완주를 축하합니다! ${runDistance} 킬로미터를 기록하여 발도장 스탬프 한 개가 적립되었습니다.`);
         triggerCelebration(`🎉 어슬런데이 완주! ${runDistance}km 기록! 스탬프 획득 완료!`);
 
-        // Refresh lists
-        await fetchUsers();
-        await fetchActivities();
-        await fetchPosts();
-
-        // Stop running and switch to Feed
         stopRunningAndCleanup();
         setTab("feed");
       }
-    } catch (e) {
-      console.error(e);
     } finally {
       setIsSubmittingRun(false);
     }
@@ -862,13 +974,28 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: currentUser.id, missionId })
       });
-      if (res.ok) {
-        triggerCelebration("💮 미션 미션 완주 스탬프 발도장을 적립했습니다!");
-        await fetchUsers();
-        await fetchMissions();
-      }
+      if (!res.ok) throw new Error("API failed");
+      triggerCelebration("💮 미션 완주 스탬프 발도장을 적립했습니다!");
+      await fetchUsers();
+      await fetchMissions();
     } catch (e) {
-      console.error(e);
+      console.warn("Using offline claim reward fallback:", e);
+      const db = getLocalDB();
+      const userIndex = db.users.findIndex(u => u.id === currentUser.id);
+      const mission = db.missions.find(m => m.id === missionId);
+      if (userIndex !== -1 && mission) {
+        const user = db.users[userIndex];
+        for (let i = 0; i < mission.rewardStamp; i++) {
+          user.stamps.push(`mission-${missionId}-${Date.now()}-${i}`);
+        }
+        if (user.stamps.length >= 5 && !user.badges.includes("stamp-collector")) {
+          user.badges.push("stamp-collector");
+        }
+        saveLocalDB(db);
+        setCurrentUser(user);
+        setUsers(db.users);
+        triggerCelebration("💮 미션 완주 스탬프 발도장을 적립했습니다!");
+      }
     }
   };
 
@@ -883,12 +1010,27 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: currentUser.id, content: newPostText })
       });
-      if (res.ok) {
-        setNewPostText("");
-        await fetchPosts();
-      }
+      if (!res.ok) throw new Error("API failed");
+      setNewPostText("");
+      await fetchPosts();
     } catch (e) {
-      console.error(e);
+      console.warn("Using offline handleCreatePost fallback:", e);
+      const db = getLocalDB();
+      const newPost = {
+        id: `post-${Date.now()}`,
+        userId: currentUser.id,
+        userName: currentUser.name,
+        grade: currentUser.grade,
+        content: newPostText,
+        likes: [],
+        comments: [],
+        date: new Date().toISOString(),
+        isRunRecord: false
+      };
+      db.posts.unshift(newPost);
+      saveLocalDB(db);
+      setPosts(db.posts);
+      setNewPostText("");
     }
   };
 
@@ -909,22 +1051,59 @@ export default function App() {
         })
       });
 
-      if (res.ok) {
-        const student = users.find(u => u.id === selectedTeacherStudentId);
-        const studentName = student ? student.name : "학생";
-        speakText(`${studentName} 학생에게 칭찬 배달 완료! 스탬프 ${teacherStampsCount}개를 선물했습니다.`);
-        triggerCelebration(`🧑‍🏫 ${studentName} 학생에게 칭찬과 스탬프 ${teacherStampsCount}개 선물 완료!`);
+      if (!res.ok) throw new Error("API failed");
+
+      const student = users.find(u => u.id === selectedTeacherStudentId);
+      const studentName = student ? student.name : "학생";
+      speakText(`${studentName} 학생에게 칭찬 배달 완료! 스탬프 ${teacherStampsCount}개를 선물했습니다.`);
+      triggerCelebration(`🧑‍🏫 ${studentName} 학생에게 칭찬과 스탬프 ${teacherStampsCount}개 선물 완료!`);
+      setTeacherMemoText("");
+      setTeacherStampsCount(1);
+      setSelectedTeacherStudentId("");
+      
+      // Refresh data
+      await fetchUsers();
+      await fetchPosts();
+      await fetchActivities();
+    } catch (e) {
+      console.warn("Using offline teacher award fallback:", e);
+      const db = getLocalDB();
+      const userIndex = db.users.findIndex(u => u.id === selectedTeacherStudentId);
+      if (userIndex !== -1) {
+        const user = db.users[userIndex];
+        const count = parseInt(teacherStampsCount as any) || 1;
+        for (let i = 0; i < count; i++) {
+          user.stamps.push(`teacher-${Date.now()}-${i}`);
+        }
+        if (user.stamps.length >= 5 && !user.badges.includes("stamp-collector")) {
+          user.badges.push("stamp-collector");
+        }
+
+        const postContent = `📢 [선생님의 칭찬 선물] 🌟 담임 선생님이 ${user.name} 학생에게 칭찬 발도장 스탬프 ${count}개와 따뜻한 격려를 보냈습니다!\n\n💬 "${teacherMemoText || '항상 성실하게 어슬런데이에 참여하는 모습이 매우 기특합니다. 앞으로도 한 걸음 한 걸음 기쁘게 달려보아요!'}"`;
+        const newPost = {
+          id: `post-teacher-${Date.now()}`,
+          userId: "teacher",
+          userName: "담임 선생님 🧑‍🏫",
+          grade: 0,
+          content: postContent,
+          likes: [],
+          comments: [],
+          date: new Date().toISOString(),
+          isRunRecord: false
+        };
+        db.posts.unshift(newPost);
+        saveLocalDB(db);
+
+        speakText(`${user.name} 학생에게 칭찬 배달 완료! 스탬프 ${count}개를 선물했습니다.`);
+        triggerCelebration(`🧑‍🏫 ${user.name} 학생에게 칭찬과 스탬프 ${count}개 선물 완료!`);
+
         setTeacherMemoText("");
         setTeacherStampsCount(1);
         setSelectedTeacherStudentId("");
-        
-        // Refresh data
-        await fetchUsers();
-        await fetchPosts();
-        await fetchActivities();
+
+        setUsers(db.users);
+        setPosts(db.posts);
       }
-    } catch (e) {
-      console.error(e);
     } finally {
       setIsSubmittingTeacherAward(false);
     }
@@ -939,11 +1118,22 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: currentUser.id })
       });
-      if (res.ok) {
-        await fetchPosts();
-      }
+      if (!res.ok) throw new Error("API failed");
+      await fetchPosts();
     } catch (e) {
-      console.error(e);
+      console.warn("Using offline like post fallback:", e);
+      const db = getLocalDB();
+      const post = db.posts.find(p => p.id === postId);
+      if (post) {
+        const idx = post.likes.indexOf(currentUser.id);
+        if (idx === -1) {
+          post.likes.push(currentUser.id);
+        } else {
+          post.likes.splice(idx, 1);
+        }
+        saveLocalDB(db);
+        setPosts(db.posts);
+      }
     }
   };
 
@@ -956,12 +1146,26 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: currentUser.id, text: postCommentText[postId] })
       });
-      if (res.ok) {
-        setPostCommentText(prev => ({ ...prev, [postId]: "" }));
-        await fetchPosts();
-      }
+      if (!res.ok) throw new Error("API failed");
+      setPostCommentText(prev => ({ ...prev, [postId]: "" }));
+      await fetchPosts();
     } catch (e) {
-      console.error(e);
+      console.warn("Using offline add comment fallback:", e);
+      const db = getLocalDB();
+      const post = db.posts.find(p => p.id === postId);
+      if (post) {
+        const newComment = {
+          id: `comment-${Date.now()}`,
+          userId: currentUser.id,
+          userName: currentUser.name,
+          text: postCommentText[postId],
+          date: new Date().toISOString()
+        };
+        post.comments.push(newComment);
+        saveLocalDB(db);
+        setPosts(db.posts);
+        setPostCommentText(prev => ({ ...prev, [postId]: "" }));
+      }
     }
   };
 
@@ -1239,24 +1443,46 @@ export default function App() {
                 />
                 <button
                   onClick={async () => {
-                    if (!guestNameInput.trim()) return;
+                    const name = guestNameInput.trim();
+                    if (!name) return;
                     setIsLoggingInGuest(true);
+                    const displayName = `${name} (게스트)`;
                     try {
                       const res = await fetch("/api/users", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ name: guestNameInput.trim(), grade: 0 })
+                        body: JSON.stringify({ name: name, grade: 0 })
                       });
-                      if (res.ok) {
-                        const user = await res.json();
-                        localStorage.setItem("easurun_user_id", user.id);
-                        setCurrentUser(user);
-                        fetchUsers(); // Refresh list
-                        speakText(`${user.name} 게스트님, 환영합니다! 어슬런데이에서 오늘 한번 멋지게 뛰어보세요.`);
-                        triggerCelebration(`👤 게스트 ${user.name}님으로 로그인되었습니다!`);
-                      }
+                      if (!res.ok) throw new Error("API failed");
+                      const user = await res.json();
+                      localStorage.setItem("easurun_user_id", user.id);
+                      setCurrentUser(user);
+                      fetchUsers(); // Refresh list
+                      speakText(`${user.name} 게스트님, 환영합니다! 어슬런데이에서 오늘 한번 멋지게 뛰어보세요.`);
+                      triggerCelebration(`👤 게스트 ${user.name}님으로 로그인되었습니다!`);
                     } catch (e) {
-                      console.error(e);
+                      console.warn("Using offline guest registration fallback:", e);
+                      const db = getLocalDB();
+                      let existingUser = db.users.find(u => u.name === displayName);
+                      if (!existingUser) {
+                        existingUser = {
+                          id: `guest-${Date.now()}`,
+                          name: displayName,
+                          grade: 0,
+                          totalDistance: 0,
+                          totalDuration: 0,
+                          level: 1,
+                          stamps: [],
+                          badges: []
+                        };
+                        db.users.push(existingUser);
+                        saveLocalDB(db);
+                      }
+                      localStorage.setItem("easurun_user_id", existingUser.id);
+                      setCurrentUser(existingUser);
+                      setUsers(db.users);
+                      speakText(`${existingUser.name} 게스트님, 환영합니다! 어슬런데이에서 오늘 한번 멋지게 뛰어보세요.`);
+                      triggerCelebration(`👤 게스트 ${existingUser.name}님으로 로그인되었습니다!`);
                     } finally {
                       setIsLoggingInGuest(false);
                     }
