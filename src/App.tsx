@@ -1665,10 +1665,19 @@ export default function App() {
                 <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">
                   안녕, {currentUser.name}! 👟
                 </h2>
-                <p className="text-sm md:text-base font-bold opacity-90 max-w-lg leading-relaxed">
-                  오늘 나주 동강의 영산강 수변을 따라 기분 좋게 어슬렁 한 바퀴 달려볼까? 
-                  조금씩 달리다 보면 전교생 랭킹도 쑥쑥 오를 거야!
-                </p>
+                <div className="space-y-2 max-w-xl">
+                  <div className="bg-slate-950/20 backdrop-blur-xs p-3.5 rounded-2xl border border-white/25 text-slate-950">
+                    <p className="text-sm md:text-base font-black tracking-tight leading-relaxed">
+                      💬 "땀흘려라 바람불면 시원하다, 그것은 바로 <span className="underline decoration-wavy decoration-emerald-950 underline-offset-4">땀바불시</span>!"
+                    </p>
+                    <p className="text-xs md:text-sm font-extrabold mt-1 text-emerald-950 opacity-90 leading-relaxed">
+                      🏃‍♂️ 달리기든 인생이든, 꾸준함은 재능을 이긴다. 빠르게가 아니라 오래, 남보다가 아니라 나답게 !!!
+                    </p>
+                  </div>
+                  <p className="text-xs md:text-sm font-bold opacity-90 leading-relaxed">
+                    💡 오늘 하루도 나만의 페이스로 가볍게 시작해보세요! 땀 흘린 뒤의 상쾌한 바람이 우리를 기다립니다.
+                  </p>
+                </div>
                 <div className="pt-3 flex flex-wrap gap-2 text-xs font-bold">
                   <span className="bg-slate-950 text-white px-3 py-1.5 rounded-xl">
                     🔥 누적 거리: {currentUser.totalDistance} km
