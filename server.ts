@@ -54,6 +54,8 @@ interface Activity {
   stampsEarned: number;
   imageUrl?: string;
   isManual?: boolean;
+  cadence?: number; // SPM (Steps Per Minute)
+  laps?: { km: number; pace: string; timeSec: number }[];
 }
 
 interface Comment {
@@ -80,6 +82,8 @@ interface Post {
   isRunRecord?: boolean;
   imageUrl?: string;
   isManual?: boolean;
+  cadence?: number;
+  laps?: { km: number; pace: string; timeSec: number }[];
 }
 
 interface Mission {
@@ -287,7 +291,7 @@ app.get("/api/activities", (req, res) => {
 // Add a running activity and sync rankings, badges, stamps, and feed post
 app.post("/api/activities", (req, res) => {
   const db = loadDB();
-  const { userId, distance, duration, pace, memo, path, date, imageUrl, isManual } = req.body;
+  const { userId, distance, duration, pace, memo, path, date, imageUrl, isManual, cadence, laps } = req.body;
 
   const user = db.users.find(u => u.id === userId);
   if (!user) {
@@ -314,7 +318,9 @@ app.post("/api/activities", (req, res) => {
     path: path || [],
     stampsEarned: 1, // Default 1 stamp for any run completed!
     imageUrl: imageUrl || undefined,
-    isManual: !!isManual
+    isManual: !!isManual,
+    cadence: cadence ? parseInt(cadence) : undefined,
+    laps: Array.isArray(laps) ? laps : undefined
   };
 
   db.activities.unshift(newActivity);
@@ -348,9 +354,10 @@ app.post("/api/activities", (req, res) => {
   }
 
   // Automatically create a social feed post for the run!
-  const typeTag = isManual ? "📱 수동 인증 러닝" : "🏃‍♂️ 실시간 어슬런";
+  const typeTag = isManual ? "📱 수동/GPX 인증 러닝" : "🏃‍♂️ 실시간 어슬런";
+  const cadenceStr = cadence ? ` | 케이던스: ${cadence} SPM` : "";
   const postContent = `${typeTag} | ${user.name} 님이 달리기를 완료했습니다! 
-✨ 거리: ${dKm}km | 시간: ${Math.floor(dSec / 60)}분 ${dSec % 60}초 | 페이스: ${pace || "6:00"}/km
+✨ 거리: ${dKm}km | 시간: ${Math.floor(dSec / 60)}분 ${dSec % 60}초 | 페이스: ${pace || "6:00"}/km${cadenceStr}
 💬 한마디: "${memo || '건강한 학교 생활을 위해 달렸습니다!'}"`;
 
   const newPost: Post = {
@@ -368,7 +375,9 @@ app.post("/api/activities", (req, res) => {
     date: runDate,
     isRunRecord: true,
     imageUrl: imageUrl || undefined,
-    isManual: !!isManual
+    isManual: !!isManual,
+    cadence: cadence ? parseInt(cadence) : undefined,
+    laps: Array.isArray(laps) ? laps : undefined
   };
 
   db.posts.unshift(newPost);

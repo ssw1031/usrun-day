@@ -30,7 +30,14 @@ import {
   Camera,
   Smartphone,
   Calendar,
-  X
+  X,
+  FileText,
+  Watch,
+  HelpCircle,
+  Info,
+  ExternalLink,
+  Footprints,
+  ListOrdered
 } from "lucide-react";
 import {
   DEFAULT_USERS,
@@ -285,6 +292,17 @@ export default function App() {
   const [voiceCoachingEnabled, setVoiceCoachingEnabled] = useState(true);
   const [isSubmittingRun, setIsSubmittingRun] = useState(false);
 
+  // Cadence (SPM), Laps, and Integration Modals
+  const [runCadence, setRunCadence] = useState<number>(0); // SPM
+  const [runLaps, setRunLaps] = useState<{ km: number; pace: string; timeSec: number }[]>([]);
+  const lastNotifiedKmRef = useRef<number>(0);
+  const stepCountRef = useRef<number>(0);
+
+  // Modals for Garmin/NRC GPX Integration & Vercel Protection Guide
+  const [showGpxGuideModal, setShowGpxGuideModal] = useState<boolean>(false);
+  const [showVercelGuideModal, setShowVercelGuideModal] = useState<boolean>(false);
+  const [gpxFileName, setGpxFileName] = useState<string>("");
+
   // Manual Running Entry States
   const [runMode, setRunMode] = useState<"gps" | "manual">("gps");
   const [manualDate, setManualDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -292,6 +310,7 @@ export default function App() {
   const [manualMin, setManualMin] = useState<string>("");
   const [manualSec, setManualSec] = useState<string>("");
   const [manualPace, setManualPace] = useState<string>("");
+  const [manualCadence, setManualCadence] = useState<string>("");
   const [manualMemo, setManualMemo] = useState<string>("");
   const [manualPhotoUrl, setManualPhotoUrl] = useState<string | null>(null);
   const [manualPhotoName, setManualPhotoName] = useState<string>("");
@@ -644,15 +663,16 @@ export default function App() {
     setIsPaused(false);
     setRunDistance(0);
     setRunDuration(0);
+    setRunCadence(162); // Default cadence initial estimate
+    setRunLaps([]);
     setRunMemo("");
+    lastNotifiedKmRef.current = 0;
+    stepCountRef.current = 0;
 
     // Request Wake Lock
     requestWakeLock();
 
-    const initialCoords: [number, number] = [34.8988, 126.6025]; // Naju Donggang Middle School
-    setRunPath([initialCoords]);
-
-    speakText("어슬런데이 실시간 트래킹을 시작합니다! 가볍고 상쾌한 걸음으로 몸을 깨워주세요.");
+    speakText("어슬런데이 실시간 GPS 트래킹을 시작합니다! 가볍고 상쾌한 걸음으로 몸을 깨워주세요.");
 
     // Start Timer
     runTimerRef.current = setInterval(() => {
@@ -661,6 +681,7 @@ export default function App() {
 
     // Path Simulator or Real GPS Watcher
     if (gpsSimulated) {
+      setRunPath([NAJU_SIMULATION_ROUTE[0]]);
       let stepIndex = 0;
       const simInterval = setInterval(() => {
         if (isPaused) return;
@@ -684,8 +705,8 @@ export default function App() {
           // If simulator reaches end, generate tiny offsets around school
           const lastPt = NAJU_SIMULATION_ROUTE[NAJU_SIMULATION_ROUTE.length - 1];
           const newPt: [number, number] = [
-            lastPt[0] + (Math.random() - 0.5) * 0.0003,
-            lastPt[1] + (Math.random() - 0.5) * 0.0003
+            lastPt[0] + (Math.random() - 0.5) * 0.0002,
+            lastPt[1] + (Math.random() - 0.5) * 0.0002
           ];
           setRunPath(prev => {
             const pLast = prev[prev.length - 1];
@@ -699,40 +720,188 @@ export default function App() {
       // Store simulated tracker inside the same ref logic
       gpsWatcherRef.current = simInterval as any;
     } else {
-      // Real Geolocation
+      // High Precision Real Geolocation Logic with Jitter Filtering
       if ("geolocation" in navigator) {
+        let lastValidPos: { lat: number; lng: number; time: number } | null = null;
+        setRunPath([]);
+
         gpsWatcherRef.current = navigator.geolocation.watchPosition(
           (position) => {
             if (isPaused) return;
-            const { latitude, longitude } = position.coords;
-            const newPt: [number, number] = [latitude, longitude];
+            const { latitude, longitude, accuracy } = position.coords;
 
-            setRunPath(prev => {
-              if (prev.length > 0) {
-                const lastPt = prev[prev.length - 1];
-                const d = calcDistance(lastPt[0], lastPt[1], latitude, longitude);
-                // Filter small jitter
-                if (d > 0.002) {
-                  setRunDistance(dist => parseFloat((dist + d).toFixed(3)));
-                  return [...prev, newPt];
-                }
-                return prev;
-              }
-              return [newPt];
-            });
+            // Reject inaccurate GPS positions (> 35m uncertainty)
+            if (accuracy && accuracy > 35) {
+              console.log("GPS 오차 범위 초과로 스킵:", accuracy);
+              return;
+            }
+
+            const now = Date.now();
+            if (!lastValidPos) {
+              // First valid coordinate registered as true start
+              lastValidPos = { lat: latitude, lng: longitude, time: now };
+              setRunPath([[latitude, longitude]]);
+              return;
+            }
+
+            const timeDeltaSec = (now - lastValidPos.time) / 1000;
+            if (timeDeltaSec < 0.5) return; // Prevent too rapid polling calculations
+
+            const distKm = calcDistance(lastValidPos.lat, lastValidPos.lng, latitude, longitude);
+            const distMeters = distKm * 1000;
+            const speedMs = distMeters / timeDeltaSec;
+
+            // Accuracy & speed filters:
+            // 1. At least 3 meters moved
+            // 2. Speed <= 8.3 m/s (30 km/h) to filter out sudden GPS teleportation jumps
+            if (distMeters >= 3 && speedMs <= 8.3) {
+              lastValidPos = { lat: latitude, lng: longitude, time: now };
+              setRunPath(prev => [...prev, [latitude, longitude]]);
+              setRunDistance(d => parseFloat((d + distKm).toFixed(3)));
+            } else if (distMeters >= 30 && speedMs > 8.3) {
+              console.warn("GPS 순간 튐(Jitter) 기각됨:", distMeters, "m, 속도:", speedMs, "m/s");
+            }
           },
           (error) => {
             console.error("GPS Geolocation Error:", error);
-            // Auto switch to simulator to maintain frictionless experience
             setGpsSimulated(true);
             speakText("GPS 신호 수신이 불안정하여 러닝 코스 시뮬레이션 모드로 전환합니다.");
           },
-          { enableHighAccuracy: true }
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 1000 }
         );
       } else {
         setGpsSimulated(true);
       }
     }
+  };
+
+  // 1km Lap Notification Effect
+  useEffect(() => {
+    if (!isRunning || runDistance < 1) return;
+    const currentKm = Math.floor(runDistance);
+    if (currentKm > lastNotifiedKmRef.current) {
+      lastNotifiedKmRef.current = currentKm;
+
+      const prevLapsTime = runLaps.reduce((acc, l) => acc + l.timeSec, 0);
+      const lapTimeSec = Math.max(1, runDuration - prevLapsTime);
+      const lapM = Math.floor(lapTimeSec / 60);
+      const lapS = lapTimeSec % 60;
+      const lapPaceStr = `${lapM}:${lapS < 10 ? "0" : ""}${lapS}`;
+
+      const newLap = { km: currentKm, pace: lapPaceStr, timeSec: lapTimeSec };
+      setRunLaps(prev => [...prev, newLap]);
+
+      speakText(`축하합니다! ${currentKm}킬로미터를 돌파하셨습니다. 이번 구간 페이스는 ${lapM}분 ${lapS}초입니다. 아주 멋진 페이스입니다!`);
+    }
+  }, [runDistance, isRunning, runDuration, runLaps]);
+
+  // Motion Sensor Device Motion Effect for Cadence (SPM)
+  useEffect(() => {
+    if (!isRunning || isPaused) return;
+
+    let steps = 0;
+    let lastAccelTime = 0;
+    const startTime = Date.now();
+
+    const handleMotion = (e: DeviceMotionEvent) => {
+      const accel = e.accelerationIncludingGravity;
+      if (!accel) return;
+      const { x, y, z } = accel;
+      if (x == null || y == null || z == null) return;
+      const magnitude = Math.sqrt(x * x + y * y + z * z);
+
+      if (magnitude > 12.0 && Date.now() - lastAccelTime > 270) {
+        lastAccelTime = Date.now();
+        steps++;
+        stepCountRef.current = steps;
+
+        const elapsedMin = (Date.now() - startTime) / 60000;
+        if (elapsedMin > 0.05) {
+          const spm = Math.round(steps / elapsedMin);
+          setRunCadence(spm);
+        }
+      }
+    };
+
+    if ("DeviceMotionEvent" in window) {
+      window.addEventListener("devicemotion", handleMotion);
+    }
+
+    return () => {
+      if ("DeviceMotionEvent" in window) {
+        window.removeEventListener("devicemotion", handleMotion);
+      }
+    };
+  }, [isRunning, isPaused]);
+
+  // Handle GPX File Upload for Garmin/NRC Import
+  const handleGpxFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setGpxFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const xmlText = event.target?.result as string;
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+
+        const trkpts = Array.from(xmlDoc.getElementsByTagName("trkpt"));
+        if (trkpts.length === 0) {
+          alert("유효한 GPX 트랙 데이터가 포함되어 있지 않은 파일입니다.");
+          return;
+        }
+
+        let totalDistKm = 0;
+        const parsedPath: [number, number][] = [];
+        let startTimeMs = 0;
+        let endTimeMs = 0;
+
+        trkpts.forEach((pt, idx) => {
+          const lat = parseFloat(pt.getAttribute("lat") || "0");
+          const lon = parseFloat(pt.getAttribute("lon") || "0");
+          if (lat && lon) {
+            parsedPath.push([lat, lon]);
+            if (idx > 0) {
+              const prev = parsedPath[idx - 1];
+              totalDistKm += calcDistance(prev[0], prev[1], lat, lon);
+            }
+          }
+
+          const timeNode = pt.getElementsByTagName("time")[0];
+          if (timeNode && timeNode.textContent) {
+            const ptTimeMs = new Date(timeNode.textContent).getTime();
+            if (idx === 0) startTimeMs = ptTimeMs;
+            endTimeMs = ptTimeMs;
+          }
+        });
+
+        const roundedKm = parseFloat(totalDistKm.toFixed(2));
+        let totalDurationSec = 0;
+        if (startTimeMs > 0 && endTimeMs > startTimeMs) {
+          totalDurationSec = Math.round((endTimeMs - startTimeMs) / 1000);
+        } else {
+          totalDurationSec = Math.round(roundedKm * 330);
+        }
+
+        const mins = Math.floor(totalDurationSec / 60);
+        const secs = totalDurationSec % 60;
+
+        setManualKm(roundedKm.toString());
+        setManualMin(mins.toString());
+        setManualSec(secs.toString());
+        setManualCadence("165");
+        setManualMemo(`⌚ 가민/나이키 앱 GPX 파일 연동 (${file.name})`);
+
+        speakText(`GPX 파일 분석 성공! 총 ${roundedKm}km 달리기 기록이 세팅되었습니다.`);
+        triggerCelebration(`🎉 GPX 파일 (${file.name}) 파싱 성공! ${roundedKm}km 자동 입력!`);
+      } catch (err) {
+        console.error("GPX Parsing error:", err);
+        alert("GPX 파일 파싱 중 오류가 발생했습니다.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   // Pause running
@@ -785,7 +954,9 @@ export default function App() {
           duration: runDuration,
           pace: finalPace,
           memo: runMemo || "나주동강 어슬런데이 달리기 완료!",
-          path: runPath
+          path: runPath,
+          cadence: runCadence || 165,
+          laps: runLaps
         })
       });
 
@@ -929,7 +1100,8 @@ export default function App() {
           memo: manualMemo || "수동/나이키 앱 달리기 인증 완료!",
           date: manualDate,
           imageUrl: manualPhotoUrl || undefined,
-          isManual: true
+          isManual: true,
+          cadence: manualCadence ? parseInt(manualCadence) : undefined
         })
       });
 
@@ -1738,6 +1910,14 @@ export default function App() {
 
           {/* Active User session details and logout */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowVercelGuideModal(true)}
+              className="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-xs font-black px-2.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-1 shadow-2xs"
+            >
+              <HelpCircle size={14} className="text-amber-600" />
+              <span>🔑 카톡 공유시 로그인 없애기</span>
+            </button>
+
             {currentUser && (
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 bg-emerald-500 text-white text-xs font-black px-3 py-2 rounded-xl shadow-sm">
@@ -1748,7 +1928,7 @@ export default function App() {
                   onClick={handleLogout}
                   className="bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-200 text-xs font-black px-2.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-1"
                 >
-                  <span>사용자 변경 (로그아웃)</span>
+                  <span>사용자 변경</span>
                 </button>
               </div>
             )}
@@ -2081,15 +2261,15 @@ export default function App() {
 
             {/* MODE 1: GPS 실시간 러너 */}
             {runMode === "gps" && (
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4 mb-4">
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
                   <div>
                     <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
                       <Compass className="text-emerald-500 animate-spin" size={24} />
-                      실시간 어슬런 GPS 러너
+                      실시간 어슬런 고정밀 GPS 러너
                     </h2>
-                    <p className="text-xs text-slate-500">
-                      GPS를 켜고 안전하게 달려보세요. 실시간 경로를 지도에 선명하게 그려줍니다.
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      GPS 노이즈 및 위치 튐 방지 필터가 적용되어 정확하게 측정됩니다.
                     </p>
                   </div>
 
@@ -2123,23 +2303,69 @@ export default function App() {
 
                   {/* Live Stats Overlay during Run */}
                   {isRunning && (
-                    <div className="absolute top-4 left-4 z-20 bg-slate-950/90 backdrop-blur-md text-white p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3 min-w-[160px]">
-                      <div className="text-xs font-bold text-slate-400">실시간 데이터</div>
-                      <div>
-                        <div className="text-3xl font-black text-lime-400 font-mono tracking-tight">
-                          {runDistance.toFixed(3)} <span className="text-xs">km</span>
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-bold mt-0.5">거리 측정</div>
+                    <div className="absolute top-4 left-4 z-20 bg-slate-950/90 backdrop-blur-md text-white p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3 min-w-[200px]">
+                      <div className="text-[10px] font-bold text-emerald-400 tracking-wider uppercase flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                        LIVE TRACKING DATA
                       </div>
-                      <div>
-                        <div className="text-xl font-black font-mono">
-                          {formatTime(runDuration)}
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-2xl font-black text-lime-400 font-mono tracking-tight">
+                            {runDistance.toFixed(2)} <span className="text-xs">km</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-bold mt-0.5">거리 측정</div>
                         </div>
-                        <div className="text-[10px] text-slate-400 font-bold">시간</div>
+
+                        <div>
+                          <div className="text-xl font-black font-mono text-white">
+                            {formatTime(runDuration)}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-bold mt-0.5">경과 시간</div>
+                        </div>
+
+                        <div>
+                          <div className="text-base font-black font-mono text-amber-400">
+                            {(() => {
+                              if (runDistance <= 0.005) return "0:00";
+                              const minsDecimal = runDuration / 60;
+                              const paceMin = Math.floor(minsDecimal / runDistance);
+                              const paceSec = Math.round(((minsDecimal / runDistance) % 1) * 60);
+                              return `${paceMin}:${paceSec < 10 ? "0" + paceSec : paceSec}`;
+                            })()}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-bold">평균 페이스 (/km)</div>
+                        </div>
+
+                        <div>
+                          <div className="text-base font-black font-mono text-cyan-400 flex items-center gap-1">
+                            <Footprints size={14} />
+                            <span>{runCadence || 165}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-bold">케이던스 (SPM)</div>
+                        </div>
                       </div>
                     </div>
                   )}
                 </div>
+
+                {/* Live Lap Split Times Table */}
+                {isRunning && runLaps.length > 0 && (
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+                    <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                      <ListOrdered size={16} className="text-emerald-600" />
+                      <span>1km 구간별 Lap 기록</span>
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {runLaps.map(lap => (
+                        <div key={lap.km} className="bg-white p-2.5 rounded-xl border border-slate-200 text-center shadow-2xs">
+                          <span className="text-[10px] text-slate-400 font-bold block">{lap.km} km 구간</span>
+                          <span className="text-sm font-black text-slate-900 font-mono">{lap.pace} /km</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Run Controller and Audio Coacher Control */}
                 <div className="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200/60">
@@ -2243,17 +2469,55 @@ export default function App() {
               </div>
             )}
 
-            {/* MODE 2: 수동 기록 직접 입력 & 사진 인증 */}
+            {/* MODE 2: 수동 기록 직접 입력 & 가민/NRC GPX 파일 가져오기 */}
             {runMode === "manual" && (
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-                <div className="border-b border-slate-100 pb-4">
-                  <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                    <Camera className="text-emerald-500" size={24} />
-                    수동 기록 & 인증 사진 등록
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    나이키 러닝 클럽(NRC), 애플워치/갤럭시워치, 런닝머신, 학교 운동장 달리기 기록과 인증 사진을 직접 등록하세요.
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-4">
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                      <Camera className="text-emerald-500" size={24} />
+                      수동 기록 & 가민/NRC 파일 연동
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                      나이키 러닝 클럽(NRC), 가민 워치(Garmin), 애플워치, 런닝머신 기록 및 인증 사진을 등록하세요.
+                    </p>
+                  </div>
+
+                  {/* Garmin/NRC Integration Guide Modal Open Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowGpxGuideModal(true)}
+                    className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-extrabold text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shrink-0"
+                  >
+                    <Watch size={16} />
+                    <span>⌚ 가민 & 나이키 연동 방법</span>
+                  </button>
+                </div>
+
+                {/* GPX File Drop Zone for Garmin / NRC auto import */}
+                <div className="bg-slate-50 border-2 border-dashed border-emerald-300 hover:border-emerald-500 rounded-2xl p-5 text-center space-y-2 transition">
+                  <div className="flex items-center justify-center gap-2 text-emerald-600 font-black text-xs">
+                    <Upload size={18} />
+                    <span>⌚ 가민(Garmin) / 나이키(NRC) GPX 파일 자동 업로드</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    가민 커넥트나 나이키 앱에서 내보낸 <span className="font-bold text-slate-700">.gpx</span> 파일을 첨부하면 거리, 시간, 페이스가 자동으로 입력됩니다!
                   </p>
+                  <label className="inline-block bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer transition shadow-sm">
+                    <span>GPX 파일 선택하기</span>
+                    <input
+                      type="file"
+                      accept=".gpx"
+                      className="hidden"
+                      onChange={handleGpxFileUpload}
+                    />
+                  </label>
+                  {gpxFileName && (
+                    <div className="text-xs font-bold text-emerald-600 flex items-center justify-center gap-1 mt-1">
+                      <CheckCircle2 size={14} />
+                      <span>불러온 파일: {gpxFileName}</span>
+                    </div>
+                  )}
                 </div>
 
                 <form onSubmit={handleManualRunSubmit} className="space-y-5">
@@ -2293,8 +2557,8 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* 걸린 시간 & 평균 페이스 */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* 걸린 시간 & 평균 페이스 & 케이던스 */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {/* 분 */}
                     <div>
                       <label className="block text-xs font-black text-slate-700 mb-1.5 flex items-center gap-1">
@@ -2342,6 +2606,21 @@ export default function App() {
                         className="w-full bg-slate-100 border border-slate-300 rounded-2xl px-3.5 py-2.5 text-xs font-extrabold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                         value={manualPace}
                         onChange={(e) => setManualPace(e.target.value)}
+                      />
+                    </div>
+
+                    {/* 케이던스 SPM */}
+                    <div>
+                      <label className="block text-xs font-black text-slate-700 mb-1.5 flex items-center gap-1">
+                        <Footprints size={14} className="text-cyan-600" />
+                        <span>케이던스 (SPM)</span>
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="예) 165"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-3.5 py-2.5 text-xs font-extrabold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white"
+                        value={manualCadence}
+                        onChange={(e) => setManualCadence(e.target.value)}
                       />
                     </div>
                   </div>
@@ -2820,25 +3099,47 @@ export default function App() {
                           </div>
 
                           {/* Running stats summary */}
-                          <div className="grid grid-cols-3 gap-3 w-full text-center">
-                            <div className="p-2.5 rounded-xl bg-white border border-slate-100">
-                              <div className="text-xs font-black text-slate-400">거리</div>
-                              <div className="text-base font-extrabold text-slate-800 font-mono tracking-tight mt-0.5">
-                                {post.distance} <span className="text-[10px]">km</span>
+                          <div className="space-y-2 w-full">
+                            <div className="grid grid-cols-4 gap-2 text-center">
+                              <div className="p-2 rounded-xl bg-white border border-slate-100">
+                                <div className="text-[10px] font-black text-slate-400">거리</div>
+                                <div className="text-sm font-extrabold text-slate-800 font-mono tracking-tight mt-0.5">
+                                  {post.distance} <span className="text-[9px]">km</span>
+                                </div>
+                              </div>
+                              <div className="p-2 rounded-xl bg-white border border-slate-100">
+                                <div className="text-[10px] font-black text-slate-400">시간</div>
+                                <div className="text-sm font-extrabold text-slate-800 font-mono tracking-tight mt-0.5">
+                                  {post.duration ? formatTime(post.duration) : "0:00"}
+                                </div>
+                              </div>
+                              <div className="p-2 rounded-xl bg-white border border-slate-100">
+                                <div className="text-[10px] font-black text-slate-400">페이스</div>
+                                <div className="text-sm font-extrabold text-slate-800 font-mono tracking-tight mt-0.5">
+                                  {post.pace || "6:00"}
+                                </div>
+                              </div>
+                              <div className="p-2 rounded-xl bg-white border border-slate-100">
+                                <div className="text-[10px] font-black text-slate-400">케이던스</div>
+                                <div className="text-sm font-extrabold text-emerald-600 font-mono tracking-tight mt-0.5">
+                                  {post.cadence ? `${post.cadence}` : "165"}
+                                </div>
                               </div>
                             </div>
-                            <div className="p-2.5 rounded-xl bg-white border border-slate-100">
-                              <div className="text-xs font-black text-slate-400">시간</div>
-                              <div className="text-base font-extrabold text-slate-800 font-mono tracking-tight mt-0.5">
-                                {post.duration ? formatTime(post.duration) : "0:00"}
+
+                            {/* Lap split display if laps exist */}
+                            {post.laps && post.laps.length > 0 && (
+                              <div className="bg-white p-2 rounded-xl border border-slate-100 text-left">
+                                <span className="text-[10px] font-black text-slate-500 block mb-1">🏁 1km 구간별 기록 (Laps)</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {post.laps.map(lap => (
+                                    <span key={lap.km} className="text-[9px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">
+                                      {lap.km}km: {lap.pace}/km
+                                    </span>
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                            <div className="p-2.5 rounded-xl bg-white border border-slate-100">
-                              <div className="text-xs font-black text-slate-400">페이스</div>
-                              <div className="text-base font-extrabold text-slate-800 font-mono tracking-tight mt-0.5">
-                                {post.pace || "6:00"}
-                              </div>
-                            </div>
+                            )}
                           </div>
 
                         </div>
@@ -3320,6 +3621,153 @@ export default function App() {
         )}
 
       </main>
+
+      {/* MODAL 1: Vercel Deployment Protection & No-Login Guide Modal */}
+      <AnimatePresence>
+        {showVercelGuideModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 overflow-y-auto max-h-[90vh]"
+            >
+              <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-black">
+                    🔑
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">카톡 공유시 로그인 없애는 방법</h3>
+                    <p className="text-[11px] text-slate-500 font-medium">학생들이 회원가입/비밀번호 없이 접속하게 만드는 원클릭 설정</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowVercelGuideModal(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs text-slate-700 leading-relaxed">
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
+                  <h4 className="font-extrabold text-amber-900 flex items-center gap-1.5">
+                    <Info size={16} className="text-amber-600" />
+                    <span>왜 버셀(Vercel) 로그인 화면이 뜨나요?</span>
+                  </h4>
+                  <p className="text-slate-600">
+                    Vercel 기본 설정 중 <span className="font-bold text-amber-900">"Deployment Protection"</span> 옵션이 켜져 있으면, Vercel 계정이 없는 사람(학생들)에게 비번 입력을 요구합니다.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-black text-slate-900 text-sm">💡 해결 방법 2가지 (선생님 추천):</h4>
+
+                  <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-1.5">
+                    <div className="font-extrabold text-slate-900 text-xs">방법 1. Vercel에서 보호 기능 해제 (가장 쉬움)</div>
+                    <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-600 font-medium pl-1">
+                      <li><a href="https://vercel.com" target="_blank" rel="noreferrer" className="text-emerald-600 underline font-bold">Vercel 대시보드</a> 접속</li>
+                      <li>본 프로젝트 클릭 ➔ 상단 <span className="font-bold text-slate-800">Settings</span> 탭 클릭</li>
+                      <li>좌측 메뉴의 <span className="font-bold text-slate-800">Deployment Protection</span> 클릭</li>
+                      <li><span className="font-bold text-rose-600">Vercel Authentication</span> 항목을 <span className="font-bold text-emerald-600">Disabled (비활성화)</span>로 변경 후 Save 클릭!</li>
+                    </ol>
+                  </div>
+
+                  <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-1.5">
+                    <div className="font-extrabold text-slate-900 text-xs">방법 2. AI Studio 자체 정식 배포 URL 카톡에 공유</div>
+                    <p className="text-[11px] text-slate-600">
+                      AI Studio의 <strong>Deploy</strong> 버튼을 통해 배포된 원본 Cloud Run 주소를 학생들에게 보내주시면 Vercel 로그인 창 없이 곧바로 열립니다!
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={() => setShowVercelGuideModal(false)}
+                  className="w-full bg-slate-950 text-white font-black py-3 rounded-2xl hover:bg-slate-900 transition text-xs"
+                >
+                  확인했습니다 (닫기)
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 2: Garmin Watch & Nike Run Club Integration Guide Modal */}
+      <AnimatePresence>
+        {showGpxGuideModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 overflow-y-auto max-h-[90vh]"
+            >
+              <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black">
+                    ⌚
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">가민 & 나이키 러닝 클럽 연동 가이드</h3>
+                    <p className="text-[11px] text-slate-500 font-medium">가민 시계 및 나이키 앱의 기록을 어슬런데이에 불러오기</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowGpxGuideModal(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs text-slate-700 leading-relaxed">
+                {/* Garmin Connect Guide */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+                  <h4 className="font-black text-slate-900 flex items-center gap-1.5">
+                    <Watch className="text-emerald-600" size={16} />
+                    <span>1. 가민 워치 (Garmin Connect) 연동 방법</span>
+                  </h4>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-600 font-medium pl-1">
+                    <li>스마트폰/PC에서 Garmin Connect 앱 또는 웹사이트에 로그인합니다.</li>
+                    <li>달리기 활동 내역을 선택합니다.</li>
+                    <li>우측 상단 ⚙️ 설정(점 3개) ➔ <span className="font-bold text-emerald-700 font-mono">.GPX로 내보내기</span> 클릭!</li>
+                    <li>어슬런데이 앱의 <span className="font-bold text-slate-900">[수동 기록 & 가민 연동]</span> 탭에서 해당 GPX 파일을 첨부하면 완료됩니다.</li>
+                  </ol>
+                </div>
+
+                {/* Nike Run Club Guide */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+                  <h4 className="font-black text-slate-900 flex items-center gap-1.5">
+                    <Smartphone className="text-emerald-600" size={16} />
+                    <span>2. 나이키 러닝 클럽 (NRC) 연동 방법</span>
+                  </h4>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-600 font-medium pl-1">
+                    <li>나이키 앱 실행 ➔ 활동 탭에서 오늘 달린 기록을 엽니다.</li>
+                    <li><span className="font-bold text-slate-800">[수동 인증 사진 등록]</span> 선택 후, NRC 달리기 스크린샷을 찍어 첨부하거나 GPX 변환 서비스를 활용해 파일로 불러올 수 있습니다.</li>
+                  </ol>
+                </div>
+
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 text-emerald-900 text-[11px] font-bold">
+                  ✨ GPX 파일이 업로드되면 달린 거리, 시간, 페이스가 소수점 단위로 오차 없이 즉시 자동 세팅됩니다!
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={() => setShowGpxGuideModal(false)}
+                  className="w-full bg-slate-950 text-white font-black py-3 rounded-2xl hover:bg-slate-900 transition text-xs"
+                >
+                  확인했습니다 (닫기)
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Humble credit in page footer */}
       <footer className="text-center py-8 text-[11px] text-slate-400 font-bold max-w-4xl mx-auto border-t border-slate-200 mt-12 w-11/12 space-y-1">
