@@ -25,7 +25,12 @@ import {
   TrendingUp,
   Smile,
   Send,
-  Plus
+  Plus,
+  Upload,
+  Camera,
+  Smartphone,
+  Calendar,
+  X
 } from "lucide-react";
 import {
   DEFAULT_USERS,
@@ -155,7 +160,7 @@ const RUNNING_PLANS: { week: number; days: PlanDay[] }[] = [
           { type: "run", duration: 90, text: "1분 30초 동안 어깨의 힘을 툭 빼고 부드럽게 뛰어보세요." },
           { type: "walk", duration: 120, text: "2분 동안 걷기 시간입니다. 가벼운 발걸음으로 천천히 호흡하세요." },
           { type: "run", duration: 90, text: "다시 한번 1분 30초 동안 힘차게 한 발씩 내딛으며 뛰어봅시다." },
-          { type: "cooldown", duration: 60, text: "정리 운동을 위해 1분간 영산강의 기분 좋은 시원한 바람을 느끼며 걷습니다." }
+          { type: "cooldown", duration: 60, text: "정리 운동을 위해 1분간 기분 좋은 시원한 바람을 느끼며 천천히 걷습니다." }
         ]
       },
       {
@@ -186,13 +191,13 @@ const RUNNING_PLANS: { week: number; days: PlanDay[] }[] = [
         title: "30분 코스 2일차 - 20분 끈기의 불꽃",
         sequence: [
           { type: "warmup", duration: 120, text: "체내 페이스 유지력을 높이는 20분 러닝 코스입니다. 워밍업 걷기 2분 출발!" },
-          { type: "run", duration: 1200, text: "20분 연속 달리기 시작! 가슴을 당당히 펴고 영산강 강변 자전거길의 경치를 정복하러 떠납니다!" },
+          { type: "run", duration: 1200, text: "20분 연속 달리기 시작! 가슴을 당당히 펴고 마을 둘레길과 운동장의 풍경을 즐기며 활기차게 달려봅니다!" },
           { type: "cooldown", duration: 120, text: "한계를 뛰어넘은 나 자신에게 격려의 박수를! 2분간 천천히 걸어 체온을 서서히 복구합니다." }
         ]
       },
       {
         day: 3,
-        title: "30분 코스 3일차 - 영산강 수변로 30분 완전 완주",
+        title: "30분 코스 3일차 - 러닝 코스 30분 완전 완주",
         sequence: [
           { type: "warmup", duration: 180, text: "꿈의 30분 논스톱 러닝 완료를 위해 3분 동안 온몸의 피를 원활히 돌리는 준비 걷기를 진행합니다." },
           { type: "run", duration: 1800, text: "대망의 30분 달리기 도전! 포기하고 싶은 순간마다 나주 동강 전교생 친구들의 응원을 떠올리며 나만의 리듬으로 한 발자국씩 가볍게 골인하세요!" },
@@ -209,7 +214,7 @@ const RUNNING_PLANS: { week: number; days: PlanDay[] }[] = [
         title: "60분 코스 1일차 - 40분 연속 에코 LSD 러닝",
         sequence: [
           { type: "warmup", duration: 180, text: "고급 지구력 빌드업 코스입니다. 3분간 힘있게 걷습니다." },
-          { type: "run", duration: 2400, text: "40분 연속 달리기 출발! '습습후후' 일정한 템포의 호흡을 타고 뇌와 온몸에 풍성한 산소를 가득 충전하며 영산강 수변을 달립니다." },
+          { type: "run", duration: 2400, text: "40분 연속 달리기 출발! '습습후후' 일정한 템포의 호흡을 타고 뇌와 온몸에 풍성한 산소를 가득 충전하며 매끄럽게 달립니다." },
           { type: "cooldown", duration: 180, text: "완벽하게 페이스를 방어하며 40분 완료! 3분 동안 가볍게 몸을 흔들며 고루 걷습니다." }
         ]
       },
@@ -224,10 +229,10 @@ const RUNNING_PLANS: { week: number; days: PlanDay[] }[] = [
       },
       {
         day: 3,
-        title: "60분 코스 3일차 - 동강 영산강 자전거길 완전 제패 (60분 완주)",
+        title: "60분 코스 3일차 - 동강 둘레길 & 코스 완전 제패 (60분 완주)",
         sequence: [
           { type: "warmup", duration: 300, text: "어슬런데이에 한 획을 그을 최종 완성! 60분 도전을 앞두고 발목과 다리 근육을 촉촉히 깨울 5분간의 준비 워밍업을 기쁘게 시작합니다." },
-          { type: "run", duration: 3600, text: "60분 연속 무한 질주! 페이스 조절을 마친 당신은 이미 최고의 엘리트 러너입니다. 지금부터 1시간 동안 강물을 조화롭게 벗 삼아 나주 동강중의 전설이 되어보세요!" },
+          { type: "run", duration: 3600, text: "60분 연속 무한 질주! 페이스 조절을 마친 당신은 이미 최고의 엘리트 러너입니다. 지금부터 1시간 동안 바람을 벗 삼아 나주 동강중의 전설이 되어보세요!" },
           { type: "cooldown", duration: 300, text: "전율이 흐르는 최종 완주 성공! 무려 60분 연속 달리기를 제패하셨습니다! 5분간 승리의 천천히 걷기를 음미하며 어슬런데이를 대성공으로 장식합니다." }
         ]
       }
@@ -241,11 +246,11 @@ const NAJU_SIMULATION_ROUTE: [number, number][] = [
   [34.8974, 126.6012], // 동강면 사무소 삼거리
   [34.8953, 126.5985], // 나주동강초등학교 정문 앞
   [34.8921, 126.5958], // 동강교차로 진입길
-  [34.8875, 126.5932], // 영산강 강변 자전거길 합류지점!
-  [34.8836, 126.5908], // 영산강 물줄기가 보이는 강변 데크길 1
-  [34.8808, 126.5931], // 영산강 정자 쉼터 (반환점)
-  [34.8836, 126.5908], // 복귀길 데크길 1
-  [34.8875, 126.5932], // 자전거길 분기점
+  [34.8875, 126.5932], // 둘레길 코스 합류지점
+  [34.8836, 126.5908], // 운동장 및 산책로 1
+  [34.8808, 126.5931], // 쉼터 정자 (반환점)
+  [34.8836, 126.5908], // 복귀길 1
+  [34.8875, 126.5932], // 코스 분기점
   [34.8921, 126.5958], // 동강교차로
   [34.8953, 126.5985], // 동강초등학교
   [34.8988, 126.6025]  // 동강중학교 복귀 (골인)
@@ -253,7 +258,7 @@ const NAJU_SIMULATION_ROUTE: [number, number][] = [
 
 const BADGE_INFO: Record<string, { name: string; desc: string; icon: string; color: string }> = {
   "first-run": { name: "어슬런의 첫발", desc: "첫 달리기를 완주하고 피드에 공유함", icon: "👟", color: "bg-emerald-100 text-emerald-700 border-emerald-300" },
-  "speedy": { name: "영산강 바람", desc: "평균 페이스 6:00 이내의 쾌속 질주 달성", icon: "⚡", color: "bg-amber-100 text-amber-700 border-amber-300" },
+  "speedy": { name: "쾌속 질주", desc: "평균 페이스 6:00 이내의 쾌속 질주 달성", icon: "⚡", color: "bg-amber-100 text-amber-700 border-amber-300" },
   "consistent": { name: "꾸준함의 아이콘", desc: "스탬프를 3개 이상 모아 성실함 입증", icon: "📅", color: "bg-blue-100 text-blue-700 border-blue-300" },
   "distance-10": { name: "동강 러너", desc: "누적 달리기 거리 10km 돌파", icon: "🏆", color: "bg-purple-100 text-purple-700 border-purple-300" },
   "marathon-club": { name: "동강철인 30", desc: "누적 달리기 거리 30km 돌파", icon: "🔥", color: "bg-orange-100 text-orange-700 border-orange-300" },
@@ -279,6 +284,36 @@ export default function App() {
   const [gpsSimulated, setGpsSimulated] = useState(true); // Default simulator mode for testing in iframe!
   const [voiceCoachingEnabled, setVoiceCoachingEnabled] = useState(true);
   const [isSubmittingRun, setIsSubmittingRun] = useState(false);
+
+  // Manual Running Entry States
+  const [runMode, setRunMode] = useState<"gps" | "manual">("gps");
+  const [manualDate, setManualDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [manualKm, setManualKm] = useState<string>("");
+  const [manualMin, setManualMin] = useState<string>("");
+  const [manualSec, setManualSec] = useState<string>("");
+  const [manualPace, setManualPace] = useState<string>("");
+  const [manualMemo, setManualMemo] = useState<string>("");
+  const [manualPhotoUrl, setManualPhotoUrl] = useState<string | null>(null);
+  const [manualPhotoName, setManualPhotoName] = useState<string>("");
+  const [isSubmittingManual, setIsSubmittingManual] = useState<boolean>(false);
+
+  // Auto calculate manual pace
+  useEffect(() => {
+    const km = parseFloat(manualKm);
+    const min = parseInt(manualMin) || 0;
+    const sec = parseInt(manualSec) || 0;
+    const totalSec = min * 60 + sec;
+
+    if (km > 0 && totalSec > 0) {
+      const paceSecPerKm = Math.round(totalSec / km);
+      const paceM = Math.floor(paceSecPerKm / 60);
+      const paceS = paceSecPerKm % 60;
+      const formattedPace = `${paceM}:${paceS < 10 ? "0" : ""}${paceS}`;
+      setManualPace(formattedPace);
+    } else {
+      setManualPace("");
+    }
+  }, [manualKm, manualMin, manualSec]);
 
   // Beginner Running Plan Training States
   const [activeTraining, setActiveTraining] = useState<{ week: number; day: number } | null>(null);
@@ -641,9 +676,9 @@ export default function App() {
 
           // Periodic Simulator voice prompts
           if (stepIndex === 4) {
-            speakText("우와! 영산강 강변 수변도로 자전거 길에 진입하셨습니다. 흐르는 강물과 바람을 느껴보세요!");
+            speakText("우와! 아름다운 마을 둘레길 코스에 진입하셨습니다. 시원한 공기와 바람을 느껴보세요!");
           } else if (stepIndex === 6) {
-            speakText("반환점인 영산강 정자에 도달했습니다! 이제 학교를 향해 힘을 내어 복귀해볼까요?");
+            speakText("코스의 반환점에 도달했습니다! 이제 학교를 향해 힘을 내어 복귀해볼까요?");
           }
         } else {
           // If simulator reaches end, generate tiny offsets around school
@@ -690,7 +725,7 @@ export default function App() {
             console.error("GPS Geolocation Error:", error);
             // Auto switch to simulator to maintain frictionless experience
             setGpsSimulated(true);
-            speakText("GPS 신호 수신이 불안정하여 영산강 데크길 시뮬레이션 모드로 전환합니다.");
+            speakText("GPS 신호 수신이 불안정하여 러닝 코스 시뮬레이션 모드로 전환합니다.");
           },
           { enableHighAccuracy: true }
         );
@@ -841,6 +876,155 @@ export default function App() {
       }
     } finally {
       setIsSubmittingRun(false);
+    }
+  };
+
+  // Handle Photo Upload for Manual Run Certification
+  const handleManualPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert("이미지 파일 크기는 10MB 이하로 업로드해주세요.");
+      return;
+    }
+    setManualPhotoName(file.name);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setManualPhotoUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Submit Manual Running Record
+  const handleManualRunSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+
+    const km = parseFloat(manualKm);
+    const min = parseInt(manualMin) || 0;
+    const sec = parseInt(manualSec) || 0;
+    const totalSec = min * 60 + sec;
+
+    if (isNaN(km) || km <= 0) {
+      alert("달린 거리를 0.01km 이상 입력해주세요.");
+      return;
+    }
+    if (totalSec <= 0) {
+      alert("걸린 시간을 입력해주세요.");
+      return;
+    }
+
+    const paceStr = manualPace || "6:00";
+    setIsSubmittingManual(true);
+
+    try {
+      const res = await fetch("/api/activities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          distance: km,
+          duration: totalSec,
+          pace: paceStr,
+          memo: manualMemo || "수동/나이키 앱 달리기 인증 완료!",
+          date: manualDate,
+          imageUrl: manualPhotoUrl || undefined,
+          isManual: true
+        })
+      });
+
+      if (res.ok) {
+        await fetchUsers();
+        await fetchActivities();
+        await fetchPosts();
+
+        speakText(`수동 인증 완주 축하합니다! ${km}km 달성으로 스탬프가 적립되었습니다.`);
+        triggerCelebration(`🎉 ${km}km 수동 달리기 인증 완료! 스탬프 획득!`);
+
+        setManualKm("");
+        setManualMin("");
+        setManualSec("");
+        setManualMemo("");
+        setManualPhotoUrl(null);
+        setManualPhotoName("");
+        setTab("feed");
+      } else {
+        throw new Error("Server error");
+      }
+    } catch (e) {
+      console.warn("Manual run submit offline fallback:", e);
+      const db = getLocalDB();
+      const userIndex = db.users.findIndex((u: any) => u.id === currentUser.id);
+      if (userIndex !== -1) {
+        const user = db.users[userIndex];
+        user.totalDistance = parseFloat((user.totalDistance + km).toFixed(2));
+        user.totalDuration += totalSec;
+        user.stamps.push(`stamp-${Date.now()}`);
+
+        if (!user.badges.includes("first-run")) user.badges.push("first-run");
+        if (user.totalDistance >= 10 && !user.badges.includes("distance-10")) user.badges.push("distance-10");
+        if (user.totalDistance >= 30 && !user.badges.includes("marathon-club")) user.badges.push("marathon-club");
+        if (user.totalDistance >= 50 && !user.badges.includes("legend")) user.badges.push("legend");
+
+        const calculatedLevel = Math.floor(user.totalDistance / 5) + 1;
+        if (calculatedLevel > user.level) user.level = calculatedLevel;
+
+        const runIsoDate = new Date(manualDate).toISOString();
+        const activityId = `act-${Date.now()}`;
+        const newAct = {
+          id: activityId,
+          userId: user.id,
+          userName: user.name,
+          grade: user.grade,
+          date: runIsoDate,
+          distance: km,
+          duration: totalSec,
+          pace: paceStr,
+          memo: manualMemo || "수동/나이키 앱 달리기 인증 완료!",
+          path: [],
+          stampsEarned: 1,
+          imageUrl: manualPhotoUrl || undefined,
+          isManual: true
+        };
+        db.activities.unshift(newAct);
+
+        const newPost = {
+          id: `post-${Date.now()}`,
+          userId: user.id,
+          userName: user.name,
+          grade: user.grade,
+          content: `📱 수동 인증 러닝 | ${user.name} 님이 달리기를 완료했습니다!\n✨ 거리: ${km}km | 시간: ${min}분 ${sec}초 | 페이스: ${paceStr}/km\n💬 한마디: "${manualMemo || '수동 러닝 완료!'}"`,
+          distance: km,
+          duration: totalSec,
+          pace: paceStr,
+          likes: [],
+          comments: [],
+          date: runIsoDate,
+          isRunRecord: true,
+          imageUrl: manualPhotoUrl || undefined,
+          isManual: true
+        };
+        db.posts.unshift(newPost);
+
+        saveLocalDB(db);
+        setCurrentUser(user);
+        setUsers(db.users);
+        setActivities(db.activities);
+        setPosts(db.posts);
+
+        speakText(`수동 인증 완주 축하합니다! ${km}km 달성으로 스탬프가 적립되었습니다.`);
+        triggerCelebration(`🎉 ${km}km 수동 달리기 인증 완료! 스탬프 획득!`);
+
+        setManualKm("");
+        setManualMin("");
+        setManualSec("");
+        setManualMemo("");
+        setManualPhotoUrl(null);
+        setManualPhotoName("");
+        setTab("feed");
+      }
+    } finally {
+      setIsSubmittingManual(false);
     }
   };
 
@@ -1860,173 +2044,389 @@ export default function App() {
           </motion.div>
         )}
 
-        {/* TAB 2: 실시간 Geolocation 러닝 */}
+        {/* TAB 2: 실시간 Geolocation 러닝 & 수동 기록 인증 */}
         {tab === "run" && currentUser && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
           >
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4 mb-4">
-                <div>
+            {/* Run Mode Switcher */}
+            <div className="flex bg-slate-200/70 p-1.5 rounded-2xl border border-slate-300/80 shadow-inner">
+              <button
+                type="button"
+                onClick={() => setRunMode("gps")}
+                className={`flex-1 py-3 px-4 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 ${
+                  runMode === "gps"
+                    ? "bg-white text-slate-950 shadow border border-slate-200"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Compass size={16} className={runMode === "gps" ? "text-emerald-500" : ""} />
+                <span>🛰️ GPS 실시간 러닝 & 시뮬레이터</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRunMode("manual")}
+                className={`flex-1 py-3 px-4 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 ${
+                  runMode === "manual"
+                    ? "bg-white text-slate-950 shadow border border-slate-200"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Smartphone size={16} className={runMode === "manual" ? "text-emerald-500" : ""} />
+                <span>📱 수동 기록 & 인증 사진 등록</span>
+              </button>
+            </div>
+
+            {/* MODE 1: GPS 실시간 러너 */}
+            {runMode === "gps" && (
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4 mb-4">
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                      <Compass className="text-emerald-500 animate-spin" size={24} />
+                      실시간 어슬런 GPS 러너
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      GPS를 켜고 안전하게 달려보세요. 실시간 경로를 지도에 선명하게 그려줍니다.
+                    </p>
+                  </div>
+
+                  {/* Tracking simulation toggle for standard desktop inside sandbox iframe */}
+                  <div className="flex items-center gap-3 bg-slate-100 px-3 py-2 rounded-2xl border border-slate-200">
+                    <span className="text-xs font-black text-slate-700">📍 코스 시뮬레이터:</span>
+                    <button
+                      onClick={() => {
+                        if (isRunning) return;
+                        setGpsSimulated(!gpsSimulated);
+                      }}
+                      disabled={isRunning}
+                      className={`text-xs font-extrabold px-3 py-1 rounded-xl transition ${
+                        gpsSimulated
+                          ? "bg-emerald-500 text-slate-950 shadow-sm"
+                          : "bg-slate-200 text-slate-500"
+                      }`}
+                    >
+                      {gpsSimulated ? "시뮬레이터 활성" : "실제 GPS 활성"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Main Map Box */}
+                <div className="relative">
+                  <div
+                    id="map-canvas-container"
+                    ref={mapContainerRef}
+                    className="w-full h-80 md:h-96 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden z-10"
+                  />
+
+                  {/* Live Stats Overlay during Run */}
+                  {isRunning && (
+                    <div className="absolute top-4 left-4 z-20 bg-slate-950/90 backdrop-blur-md text-white p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3 min-w-[160px]">
+                      <div className="text-xs font-bold text-slate-400">실시간 데이터</div>
+                      <div>
+                        <div className="text-3xl font-black text-lime-400 font-mono tracking-tight">
+                          {runDistance.toFixed(3)} <span className="text-xs">km</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold mt-0.5">거리 측정</div>
+                      </div>
+                      <div>
+                        <div className="text-xl font-black font-mono">
+                          {formatTime(runDuration)}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-bold">시간</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Run Controller and Audio Coacher Control */}
+                <div className="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200/60">
+                  <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                    
+                    {/* Voice Coacher Guide setup */}
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        onClick={() => setVoiceCoachingEnabled(!voiceCoachingEnabled)}
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center border transition ${
+                          voiceCoachingEnabled
+                            ? "bg-emerald-100 border-emerald-300 text-emerald-600 shadow-sm"
+                            : "bg-slate-100 border-slate-200 text-slate-400"
+                        }`}
+                      >
+                        {voiceCoachingEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                      </button>
+                      <div>
+                        <h4 className="text-xs font-extrabold text-slate-800">보이스 코칭 동시 안내</h4>
+                        <p className="text-[10px] text-slate-500">Runday식 힘나는 음성 코칭을 들으며 달립니다.</p>
+                      </div>
+                    </div>
+
+                    {/* Core Action triggers */}
+                    <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                      {!isRunning ? (
+                        <button
+                          onClick={startRunning}
+                          className="w-full md:w-44 bg-gradient-to-r from-emerald-500 to-lime-500 text-slate-950 font-black py-3 px-6 rounded-2xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2"
+                        >
+                          <Play size={18} fill="currentColor" />
+                          <span>달리기 시작!</span>
+                        </button>
+                      ) : (
+                        <>
+                          {isPaused ? (
+                            <button
+                              onClick={resumeRunning}
+                              className="bg-emerald-500 text-slate-950 font-black py-2.5 px-5 rounded-2xl shadow-sm hover:bg-emerald-600 transition text-xs md:text-sm"
+                            >
+                              다시 계속하기
+                            </button>
+                          ) : (
+                            <button
+                              onClick={pauseRunning}
+                              className="bg-amber-500 text-slate-950 font-black py-2.5 px-5 rounded-2xl shadow-sm hover:bg-amber-600 transition text-xs md:text-sm"
+                            >
+                              일시 정지
+                            </button>
+                          )}
+                          <button
+                            onClick={stopRunningAndCleanup}
+                            className="bg-slate-200 text-slate-700 font-bold py-2.5 px-5 rounded-2xl shadow-sm hover:bg-slate-300 transition text-xs md:text-sm"
+                          >
+                            운동 포기
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* Save Run Form: Unlocked after some running distance */}
+                {isRunning && runDistance >= 0.05 && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className="mt-6 border-t border-slate-100 pt-6 space-y-4"
+                  >
+                    <div>
+                      <label className="block text-xs font-black text-slate-800 mb-1.5">
+                        ✏️ 오늘 러닝 완료 한마디 (피드 공유)
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white"
+                        placeholder="예) 오늘 땀 흘리고 바람 맞으니 짱 시원하네! 미션 완료해서 기분 좋다!"
+                        value={runMemo}
+                        onChange={(e) => setRunMemo(e.target.value)}
+                      />
+                    </div>
+
+                    <button
+                      onClick={submitRunningRecord}
+                      disabled={isSubmittingRun}
+                      className="w-full bg-slate-950 hover:bg-slate-900 text-emerald-400 font-extrabold py-3.5 rounded-2xl shadow-md transition flex items-center justify-center gap-2"
+                    >
+                      {isSubmittingRun ? (
+                        <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <CheckCircle2 size={18} />
+                          <span>러닝 완주 & 피드 기록 제출하기</span>
+                        </>
+                      )}
+                    </button>
+                  </motion.div>
+                )}
+
+              </div>
+            )}
+
+            {/* MODE 2: 수동 기록 직접 입력 & 사진 인증 */}
+            {runMode === "manual" && (
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                <div className="border-b border-slate-100 pb-4">
                   <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                    <Compass className="text-emerald-500 animate-spin" size={24} />
-                    실시간 어슬런 GPS 러너
+                    <Camera className="text-emerald-500" size={24} />
+                    수동 기록 & 인증 사진 등록
                   </h2>
-                  <p className="text-xs text-slate-500">
-                    GPS를 켜고 안전하게 달려보세요. 실시간 경로를 지도에 선명하게 그려줍니다.
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    나이키 러닝 클럽(NRC), 애플워치/갤럭시워치, 런닝머신, 학교 운동장 달리기 기록과 인증 사진을 직접 등록하세요.
                   </p>
                 </div>
 
-                {/* Tracking simulation toggle for standard desktop inside sandbox iframe */}
-                <div className="flex items-center gap-3 bg-slate-100 px-3 py-2 rounded-2xl border border-slate-200">
-                  <span className="text-xs font-black text-slate-700">📍 영산강 코스 시뮬레이터:</span>
-                  <button
-                    onClick={() => {
-                      if (isRunning) return;
-                      setGpsSimulated(!gpsSimulated);
-                    }}
-                    disabled={isRunning}
-                    className={`text-xs font-extrabold px-3 py-1 rounded-xl transition ${
-                      gpsSimulated
-                        ? "bg-emerald-500 text-slate-950 shadow-sm"
-                        : "bg-slate-200 text-slate-500"
-                    }`}
-                  >
-                    {gpsSimulated ? "시뮬레이터 활성" : "실제 GPS 활성"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Main Map Box */}
-              <div className="relative">
-                <div
-                  id="map-canvas-container"
-                  ref={mapContainerRef}
-                  className="w-full h-80 md:h-96 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden z-10"
-                />
-
-                {/* Live Stats Overlay during Run */}
-                {isRunning && (
-                  <div className="absolute top-4 left-4 z-20 bg-slate-950/90 backdrop-blur-md text-white p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3 min-w-[160px]">
-                    <div className="text-xs font-bold text-slate-400">실시간 데이터</div>
+                <form onSubmit={handleManualRunSubmit} className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* 달린 날짜 */}
                     <div>
-                      <div className="text-3xl font-black text-lime-400 font-mono tracking-tight">
-                        {runDistance.toFixed(3)} <span className="text-xs">km</span>
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-bold mt-0.5">거리 측정</div>
+                      <label className="block text-xs font-black text-slate-700 mb-1.5 flex items-center gap-1">
+                        <Calendar size={14} className="text-emerald-600" />
+                        <span>달린 날짜</span>
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-3.5 py-2.5 text-xs font-extrabold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white"
+                        value={manualDate}
+                        onChange={(e) => setManualDate(e.target.value)}
+                      />
                     </div>
-                    <div>
-                      <div className="text-xl font-black font-mono">
-                        {formatTime(runDuration)}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-bold">시간</div>
-                    </div>
-                  </div>
-                )}
-              </div>
 
-              {/* Run Controller and Audio Coacher Control */}
-              <div className="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200/60">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                  
-                  {/* Voice Coacher Guide setup */}
-                  <div className="flex items-center gap-2.5">
-                    <button
-                      onClick={() => setVoiceCoachingEnabled(!voiceCoachingEnabled)}
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center border transition ${
-                        voiceCoachingEnabled
-                          ? "bg-emerald-100 border-emerald-300 text-emerald-600 shadow-sm"
-                          : "bg-slate-100 border-slate-200 text-slate-400"
-                      }`}
-                    >
-                      {voiceCoachingEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
-                    </button>
+                    {/* 달린 거리 (km) */}
                     <div>
-                      <h4 className="text-xs font-extrabold text-slate-800">보이스 코칭 동시 안내</h4>
-                      <p className="text-[10px] text-slate-500">Runday식 힘나는 음성 코칭을 들으며 달립니다.</p>
+                      <label className="block text-xs font-black text-slate-700 mb-1.5 flex items-center gap-1">
+                        <Flame size={14} className="text-amber-500" />
+                        <span>달린 거리 (km)</span>
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.1"
+                        max="100"
+                        required
+                        placeholder="예) 3.5"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-3.5 py-2.5 text-xs font-extrabold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white"
+                        value={manualKm}
+                        onChange={(e) => setManualKm(e.target.value)}
+                      />
                     </div>
                   </div>
 
-                  {/* Core Action triggers */}
-                  <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                    {!isRunning ? (
-                      <button
-                        onClick={startRunning}
-                        className="w-full md:w-44 bg-gradient-to-r from-emerald-500 to-lime-500 text-slate-950 font-black py-3 px-6 rounded-2xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2"
-                      >
-                        <Play size={18} fill="currentColor" />
-                        <span>달리기 시작!</span>
-                      </button>
+                  {/* 걸린 시간 & 평균 페이스 */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* 분 */}
+                    <div>
+                      <label className="block text-xs font-black text-slate-700 mb-1.5 flex items-center gap-1">
+                        <Clock size={14} className="text-blue-500" />
+                        <span>걸린 시간 (분)</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="500"
+                        required
+                        placeholder="예) 20"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-3.5 py-2.5 text-xs font-extrabold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white"
+                        value={manualMin}
+                        onChange={(e) => setManualMin(e.target.value)}
+                      />
+                    </div>
+
+                    {/* 초 */}
+                    <div>
+                      <label className="block text-xs font-black text-slate-700 mb-1.5 flex items-center gap-1">
+                        <Clock size={14} className="text-blue-400" />
+                        <span>걸린 시간 (초)</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="59"
+                        placeholder="예) 30"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-3.5 py-2.5 text-xs font-extrabold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white"
+                        value={manualSec}
+                        onChange={(e) => setManualSec(e.target.value)}
+                      />
+                    </div>
+
+                    {/* 평균 페이스 (자동 계산 / 수정 가능) */}
+                    <div>
+                      <label className="block text-xs font-black text-slate-700 mb-1.5 flex items-center gap-1">
+                        <TrendingUp size={14} className="text-purple-500" />
+                        <span>평균 페이스 (/km)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="자동 계산 (예: 5:45)"
+                        className="w-full bg-slate-100 border border-slate-300 rounded-2xl px-3.5 py-2.5 text-xs font-extrabold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        value={manualPace}
+                        onChange={(e) => setManualPace(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 인증 사진 업로드 */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Camera size={14} className="text-emerald-500" />
+                        <span>달리기 인증 사진 업로드 (나이키 앱 스크린샷 / 계기판 / 인증샷)</span>
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400">선택 사항</span>
+                    </label>
+
+                    {manualPhotoUrl ? (
+                      <div className="relative rounded-2xl border-2 border-emerald-400 bg-slate-900 p-3 flex flex-col items-center justify-center">
+                        <img
+                          src={manualPhotoUrl}
+                          alt="인증 사진 미리보기"
+                          className="max-h-60 rounded-xl object-contain"
+                        />
+                        <div className="mt-2 flex items-center justify-between w-full text-xs text-white px-2">
+                          <span className="truncate max-w-[200px] font-bold">{manualPhotoName || "인증사진.png"}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setManualPhotoUrl(null);
+                              setManualPhotoName("");
+                            }}
+                            className="bg-rose-500 hover:bg-rose-600 text-white px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1"
+                          >
+                            <X size={14} />
+                            <span>삭제</span>
+                          </button>
+                        </div>
+                      </div>
                     ) : (
-                      <>
-                        {isPaused ? (
-                          <button
-                            onClick={resumeRunning}
-                            className="bg-emerald-500 text-slate-950 font-black py-2.5 px-5 rounded-2xl shadow-sm hover:bg-emerald-600 transition text-xs md:text-sm"
-                          >
-                            다시 계속하기
-                          </button>
-                        ) : (
-                          <button
-                            onClick={pauseRunning}
-                            className="bg-amber-500 text-slate-950 font-black py-2.5 px-5 rounded-2xl shadow-sm hover:bg-amber-600 transition text-xs md:text-sm"
-                          >
-                            일시 정지
-                          </button>
-                        )}
-                        <button
-                          onClick={stopRunningAndCleanup}
-                          className="bg-slate-200 text-slate-700 font-bold py-2.5 px-5 rounded-2xl shadow-sm hover:bg-slate-300 transition text-xs md:text-sm"
-                        >
-                          운동 포기
-                        </button>
-                      </>
+                      <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50 hover:bg-emerald-50/30 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition text-center">
+                        <Upload size={32} className="text-slate-400 mb-2" />
+                        <span className="text-xs font-black text-slate-700">클릭하여 인증 사진 첨부하기</span>
+                        <span className="text-[10px] text-slate-400 mt-1">나이키 러닝 클럽 스크린샷, 런닝머신 계기판, 운동장 인증샷 등</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleManualPhotoUpload}
+                        />
+                      </label>
                     )}
                   </div>
 
-                </div>
-              </div>
-
-              {/* Save Run Form: Unlocked after some running distance */}
-              {isRunning && runDistance >= 0.05 && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  className="mt-6 border-t border-slate-100 pt-6 space-y-4"
-                >
+                  {/* 소감 한마디 */}
                   <div>
-                    <label className="block text-xs font-black text-slate-800 mb-1.5">
-                      ✏️ 오늘 러닝 완료 한마디 (피드 공유)
+                    <label className="block text-xs font-black text-slate-700 mb-1.5 flex items-center gap-1">
+                      <Smile size={14} className="text-amber-500" />
+                      <span>오늘 달리기의 한마디 & 소감 (피드 공유)</span>
                     </label>
-                    <input
-                      type="text"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white"
-                      placeholder="예) 오늘 영산강 바람 짱 시원하네! 미션 완료해서 기분 좋다!"
-                      value={runMemo}
-                      onChange={(e) => setRunMemo(e.target.value)}
+                    <textarea
+                      rows={2}
+                      placeholder="예) 초등학교 운동장 10바퀴 완주! 상쾌한 바람 맞으며 달렸어요."
+                      className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white resize-none"
+                      value={manualMemo}
+                      onChange={(e) => setManualMemo(e.target.value)}
                     />
                   </div>
 
+                  {/* Submit Button */}
                   <button
-                    onClick={submitRunningRecord}
-                    disabled={isSubmittingRun}
+                    type="submit"
+                    disabled={isSubmittingManual}
                     className="w-full bg-slate-950 hover:bg-slate-900 text-emerald-400 font-extrabold py-3.5 rounded-2xl shadow-md transition flex items-center justify-center gap-2"
                   >
-                    {isSubmittingRun ? (
+                    {isSubmittingManual ? (
                       <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <>
                         <CheckCircle2 size={18} />
-                        <span>러닝 완주 & 피드 기록 제출하기</span>
+                        <span>📸 수동 기록 & 인증 사진 제출하기</span>
                       </>
                     )}
                   </button>
-                </motion.div>
-              )}
+                </form>
+              </div>
+            )}
 
-            </div>
           </motion.div>
         )}
 
@@ -2334,7 +2734,7 @@ export default function App() {
                 <textarea
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white resize-none"
                   rows={3}
-                  placeholder="예) 오늘 영산강교차로에서 바람 장난 아니네요! 다들 달리기 가요!"
+                  placeholder="예) 오늘 운동장에서 땀 흘리며 달렸어요! 다들 어슬런데이 가요!"
                   value={newPostText}
                   onChange={(e) => setNewPostText(e.target.value)}
                 />
@@ -2387,6 +2787,17 @@ export default function App() {
                       <p className="text-xs md:text-sm text-slate-700 font-medium whitespace-pre-wrap leading-relaxed">
                         {post.content}
                       </p>
+
+                      {/* Photo certification image if available */}
+                      {post.imageUrl && (
+                        <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 max-h-96 flex justify-center items-center shadow-inner">
+                          <img
+                            src={post.imageUrl}
+                            alt="달리기 인증 사진"
+                            className="max-h-96 w-auto object-contain hover:scale-105 transition-transform duration-300"
+                          />
+                        </div>
+                      )}
 
                       {/* If linked to running activity path - Render Canvas View */}
                       {post.isRunRecord && post.path && post.path.length > 0 && (
@@ -2743,7 +3154,7 @@ export default function App() {
                   </div>
                   <textarea
                     className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-3 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-indigo-400 focus:outline-none h-20 placeholder:text-slate-400"
-                    placeholder="예: 어제 영산강 데크길을 따라 페이스를 조절해가며 완주해낸 끈기를 칭찬합니다! 조금씩 자라나는 체력이 참 멋집니다."
+                    placeholder="예: 어제 운동장 트랙을 따라 페이스를 조절해가며 완주해낸 끈기를 칭찬합니다! 조금씩 자라나는 체력이 참 멋집니다."
                     value={teacherMemoText}
                     onChange={(e) => setTeacherMemoText(e.target.value)}
                     required

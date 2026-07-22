@@ -52,6 +52,8 @@ interface Activity {
   memo: string;
   path: [number, number][]; // coordinates [lat, lng]
   stampsEarned: number;
+  imageUrl?: string;
+  isManual?: boolean;
 }
 
 interface Comment {
@@ -76,6 +78,8 @@ interface Post {
   comments: Comment[];
   date: string;
   isRunRecord?: boolean;
+  imageUrl?: string;
+  isManual?: boolean;
 }
 
 interface Mission {
@@ -283,7 +287,7 @@ app.get("/api/activities", (req, res) => {
 // Add a running activity and sync rankings, badges, stamps, and feed post
 app.post("/api/activities", (req, res) => {
   const db = loadDB();
-  const { userId, distance, duration, pace, memo, path } = req.body;
+  const { userId, distance, duration, pace, memo, path, date, imageUrl, isManual } = req.body;
 
   const user = db.users.find(u => u.id === userId);
   if (!user) {
@@ -294,6 +298,7 @@ app.post("/api/activities", (req, res) => {
   const dKm = parseFloat(distance);
   const dSec = parseInt(duration);
   const activityId = `act-${Date.now()}`;
+  const runDate = date ? new Date(date).toISOString() : new Date().toISOString();
   
   // Create running activity
   const newActivity: Activity = {
@@ -301,13 +306,15 @@ app.post("/api/activities", (req, res) => {
     userId,
     userName: user.name,
     grade: user.grade,
-    date: new Date().toISOString(),
+    date: runDate,
     distance: dKm,
     duration: dSec,
     pace: pace || "6:00",
     memo: memo || "어슬런데이 달리기 완료!",
     path: path || [],
-    stampsEarned: 1 // Default 1 stamp for any run completed!
+    stampsEarned: 1, // Default 1 stamp for any run completed!
+    imageUrl: imageUrl || undefined,
+    isManual: !!isManual
   };
 
   db.activities.unshift(newActivity);
@@ -341,7 +348,8 @@ app.post("/api/activities", (req, res) => {
   }
 
   // Automatically create a social feed post for the run!
-  const postContent = `🏃‍♂️ ${user.name} 학생이 어슬런데이 달리기를 완주했습니다! 
+  const typeTag = isManual ? "📱 수동 인증 러닝" : "🏃‍♂️ 실시간 어슬런";
+  const postContent = `${typeTag} | ${user.name} 님이 달리기를 완료했습니다! 
 ✨ 거리: ${dKm}km | 시간: ${Math.floor(dSec / 60)}분 ${dSec % 60}초 | 페이스: ${pace || "6:00"}/km
 💬 한마디: "${memo || '건강한 학교 생활을 위해 달렸습니다!'}"`;
 
@@ -357,8 +365,10 @@ app.post("/api/activities", (req, res) => {
     path: path || [],
     likes: [],
     comments: [],
-    date: new Date().toISOString(),
-    isRunRecord: true
+    date: runDate,
+    isRunRecord: true,
+    imageUrl: imageUrl || undefined,
+    isManual: !!isManual
   };
 
   db.posts.unshift(newPost);
@@ -556,7 +566,7 @@ ${recentMemos || "최근 기록 없음 (첫 걸음을 떼기를 기다리고 있
 
 [답변 가이드라인]
 1. 분석 리포트: 누적 거리와 레벨을 칭찬하고, 학생의 페이스나 러닝 습관에 대해 따뜻하고 활기찬 격려를 적어주세요.
-2. 성장을 위한 다음 미션 추천: 이번 주에 도전하면 좋은 구체적인 맞춤 목표를 제안해주세요 (예: '동강 영산강 강변에서 3km 쉬지 않고 완주하기', '스탬프 1개 추가 적립하기' 등).
+2. 성장을 위한 다음 미션 추천: 이번 주에 도전하면 좋은 구체적인 맞춤 목표를 제안해주세요 (예: '동강 둘레길이나 학교 운동장에서 3km 쉬지 않고 완주하기', '스탬프 1개 추가 적립하기' 등).
 3. 건강 코칭: 성장기 중학생을 위해 부상 방지 팁이나 발을 디딜 때의 바른 자세, 수분 섭취의 중요성을 알기 쉽게 설명해주세요.
 
 친절하고 역동적인 마크다운 형식으로 출력해주세요.`;
@@ -569,14 +579,14 @@ ${recentMemos || "최근 기록 없음 (첫 걸음을 떼기를 기다리고 있
 
 **💡 코치님의 응원:**
 - 벌써 **${user.level}레벨**에 도달하고 **${user.stamps.length}개**의 스탬프를 모았다니, 끈기 하나는 우리 동강중 전교 1등 감이네요!
-- 최근 기록에서 느껴지는 건강한 에너지가 너무 보기 좋습니다. 영산강 강변길을 뛰거나 운동장을 돌면서 한 단계씩 체력을 높여가는 모습이 최고예요.
+- 최근 기록에서 느껴지는 건강한 에너지가 너무 보기 좋습니다. 학교 운동장을 돌거나 마을 둘레길을 뛰면서 한 단계씩 체력을 높여가는 모습이 최고예요.
 
 **🎯 다음 목표 제안:**
 - 이번 주에는 **누적 3km 추가 달성**해서 스탬프 발도장을 더 모아볼까요? 친구들과 함께 랭킹 배틀을 하면서 같이 달리면 재미가 두 배가 될 거예요!
 
 **안전 러닝 꿀팁:**
 - 달리기 전후에는 발목과 무릎 스트레칭을 꼭! 해주세요.
-- 달릴 때 턱을 가볍게 당기고 영산강의 맑은 공기를 가슴 깊이 마시며 뛰면 폐활량이 쑥쑥 늘어납니다! 수분 섭취도 잊지 마세요 🥤`;
+- 달릴 때 턱을 가볍게 당기고 맑은 공기를 가슴 깊이 마시며 뛰면 폐활량이 쑥쑥 늘어납니다! 수분 섭취도 잊지 마세요 🥤`;
     return res.json({ analysis: fallbackResponse });
   }
 
